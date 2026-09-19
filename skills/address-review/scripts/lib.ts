@@ -22,7 +22,7 @@ export const api = async (args: string[], jq?: string): Promise<string> => {
   return gh(argv);
 };
 
-export const gql = (query: string, args: string[], jq?: string): Promise<string> =>
+export const gql = async (query: string, args: string[], jq?: string): Promise<string> =>
   api(['graphql', '-f', `query=${query}`, ...args], jq);
 
 export const retry = async <T>(fn: () => Promise<T>, attempts = 3): Promise<T> => {

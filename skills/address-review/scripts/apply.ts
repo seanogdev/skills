@@ -141,9 +141,9 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
   // Both are idempotent, so both retry, and neither waits on the other.
   const [vote, resolve] = await Promise.allSettled([
     item.vote
-      ? retry(() => gql(Q.vote, ['-f', `subjectId=${item.commentId}`, '-f', `content=${item.vote}`]))
+      ? retry(async () => gql(Q.vote, ['-f', `subjectId=${item.commentId}`, '-f', `content=${item.vote}`]))
       : Promise.resolve(null),
-    item.resolve ? retry(() => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
+    item.resolve ? retry(async () => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
   ]);
 
   function record(key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) {
@@ -252,8 +252,8 @@ const results: Result[] = plan!.map((item) => ({
 // Every reply goes out, then every vote and resolve. Rounds, not per item, so a
 // vote never lands on a thread ahead of the reply that explains it.
 const pairs = plan!.map((item, i) => [item, results[i]] as const);
-await pool(pairs, JOBS, ([item, out]) => postReply(item, viewer, out));
-await pool(pairs, JOBS, ([item, out]) => voteAndResolve(item, out));
+await pool(pairs, JOBS, async ([item, out]) => postReply(item, viewer, out));
+await pool(pairs, JOBS, async ([item, out]) => voteAndResolve(item, out));
 
 console.log(
   table(
