@@ -22,7 +22,7 @@ It goes through `apply.ts` as a single item that carries a `prId` and a `bodyFil
 [{ "ref": "round summary", "prId": "PR_kwDO...", "bodyFile": "/tmp/round.md" }]
 ```
 
-`gh pr view --json id --jq .id` is where that `prId` comes from when no `fetch.sh` ran this pass.
+`gh pr view --json id --jq .id` is where that `prId` comes from when no `fetch.ts` ran this pass.
 
 That comment is the only place the round goes. Never move it, or any part of it, into the PR description. The description follows the rule in **Finishing** in `SKILL.md`, the same as on any other pass.
 

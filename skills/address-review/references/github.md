@@ -9,7 +9,7 @@ Each path below is relative to the skill directory, the one that holds `SKILL.md
 **Query first, every time.** Read the feedback from the API as the first action of the pass. A read from earlier in this conversation is stale. Do not reuse it. Reviewers add comments while a pass runs. A second invocation minutes after the first usually means something landed in between.
 
 ```bash
-./scripts/fetch.sh [PR]
+./scripts/fetch.ts [PR]
 ```
 
 Pass `$ARGUMENTS` as the `[PR]` argument only when it names a PR. A review file path must never reach this command.

@@ -11,11 +11,15 @@ export const die = (prog: string, msg: string): never => {
 };
 
 // No shell, so a body or an id never gets a chance to be parsed as one.
+export const gh = async (args: string[]): Promise<string> => {
+  const { stdout } = await run('gh', args);
+  return stdout.trim();
+};
+
 export const api = async (args: string[], jq?: string): Promise<string> => {
   const argv = ['api', ...args];
   if (jq) argv.push('--jq', jq);
-  const { stdout } = await run('gh', argv);
-  return stdout.trim();
+  return gh(argv);
 };
 
 export const gql = (query: string, args: string[], jq?: string): Promise<string> =>
