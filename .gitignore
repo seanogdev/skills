@@ -1,2 +1,19 @@
-.DS_Store
 evals/.runs/
+
+# Node dependencies
+node_modules/
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.eslintcache
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
