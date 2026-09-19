@@ -36,7 +36,7 @@ Read the whole thread, your own reply included. Treat the last comment as the li
 
 If they accept the answer or say thanks, do nothing more: the thread stays resolved, it needs no plan item, and a row in the summary is the whole of it.
 
-Otherwise reply, re-vote where the call moved, and resolve again. Reactions add, they do not replace. Clear the old vote with `scripts/unvote.sh` before you cast the new one. If the call moves to a decline on a human comment, `scripts/unvote.sh` is the whole action. No vote replaces the one you remove.
+Otherwise reply, re-vote where the call moved, and resolve again. Reactions add, they do not replace. Clear the old vote with `scripts/unvote.ts` before you cast the new one. If the call moves to a decline on a human comment, `scripts/unvote.ts` is the whole action. No vote replaces the one you remove.
 
 ## Votes the user left
 
@@ -92,7 +92,7 @@ Never vote a human's comment down. The reply carries the decline, and it says wh
 
 Vote on the comment that raised the point, which is the first comment in the thread. Do not vote on your own reply. Cast one vote per comment. The vote must match what the reply says. A reply that declines and a thumbs up next to it read as a contradiction.
 
-Undo a vote with `./scripts/unvote.sh COMMENT_URL`. A vote on a review body cannot be undone at all, so be sure of that one before you cast it.
+Undo a vote with `./scripts/unvote.ts COMMENT_URL`. A vote on a review body cannot be undone at all, so be sure of that one before you cast it.
 
 A comment the user already voted on keeps their vote. It is on the same account as yours. Do not add to it, change it or remove it. Your reply carries your call on those.
 
