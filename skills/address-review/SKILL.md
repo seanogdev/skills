@@ -5,8 +5,6 @@ license: MIT
 argument-hint: "[PR number, url or branch, or a path to a review file]"
 ---
 
-# Address review
-
 Take every item of live feedback to a conclusion. Fix it, or push back on it. Then account for the whole pass to the user. On a PR, also reply either way, vote on the comment, and resolve the thread. Inline threads are only one of three places feedback arrives.
 
 ## Where the feedback is
