@@ -55,5 +55,5 @@ way as any other third-party skill.
 ## Evals
 
 `evals/` holds trigger and output-quality fixtures for these skills. See `evals/README.md`.
-`_scripts/optimize-skill-descriptions.sh` runs the description-trigger evals and the
+`scripts/optimize-skill-descriptions.sh` runs the description-trigger evals and the
 description-optimization loop.

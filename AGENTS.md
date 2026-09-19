@@ -8,6 +8,6 @@ every skill so it works on any machine:
   something like that, it belongs in seanogdev/dotfiles instead, not here.
 - `license: MIT` in every `SKILL.md` frontmatter.
 - Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing. Run
-  `_scripts/optimize-skill-descriptions.sh` after changing a `description` field.
+  `scripts/optimize-skill-descriptions.sh` after changing a `description` field.
 - The repo root is also a Claude Code plugin root (`.claude-plugin/`). Adding a skill under
   `skills/` is enough; there is no separate list to update.

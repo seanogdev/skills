@@ -11,6 +11,6 @@ Two kinds, per <https://agentskills.io>:
   produce a good result? See
   <https://agentskills.io/skill-creation/evaluating-skills>. Not built yet.
 
-`_scripts/optimize-skill-descriptions.sh` runs the `descriptions/` evals
+`scripts/optimize-skill-descriptions.sh` runs the `descriptions/` evals
 and the description-optimization loop. Run history and scores land in
 `evals/.runs/` (gitignored).
