@@ -18,7 +18,10 @@
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "lint": "oxlint --type-aware --fix --ignore-path .gitignore",
+    "format": "oxfmt",
+    "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec nano-staged"
