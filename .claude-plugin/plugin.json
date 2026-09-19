@@ -8,8 +8,8 @@
     "email": "1761115+seanogdev@users.noreply.github.com",
     "url": "https://github.com/seanogdev"
   },
-  "homepage": "https://github.com/seanogdev/dotfiles",
-  "repository": "https://github.com/seanogdev/dotfiles",
+  "homepage": "https://github.com/seanogdev/skills",
+  "repository": "https://github.com/seanogdev/skills",
   "license": "MIT",
-  "keywords": ["dotfiles", "skills"]
+  "keywords": ["skills", "claude-code", "agent-skills"]
 }

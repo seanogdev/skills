@@ -4,8 +4,8 @@ Public Claude Code / agent-skills repo. Each skill lives at `skills/<name>/SKILL
 installed on other people's machines via `gh skill`, `npx skills`, or the Claude Code plugin. Write
 every skill so it works on any machine:
 
-- No dotfiles-specific paths, fish functions, or other machine-only assumptions. If a skill needs
-  something like that, it belongs in seanogdev/dotfiles instead, not here.
+- No machine-specific paths, shell functions, or other assumptions about one particular setup. A
+  skill that needs those belongs in a personal machine-config repo instead, not here.
 - `license: MIT` in every `SKILL.md` frontmatter.
 - Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing. Run
   `scripts/optimize-skill-descriptions.sh` after changing a `description` field.
