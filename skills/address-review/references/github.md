@@ -20,16 +20,7 @@ Still live means unresolved, plus any thread you replied in that someone spoke o
 
 Skip anything `viewer` wrote. Skip the CI and coverage chatter a PR collects. Your own replies inside a thread are the exception. They are what the reviewer answers, so read them. Keep every `url`. The summary at the end links its rows by them.
 
-Each id becomes a plan field:
-
-| Source field | Plan field |
-| --- | --- |
-| `threads[].id` | `threadId` |
-| `threads[].comments[0].id` | `commentId` |
-| `reviews[].id` | `commentId`, plus the `prId` |
-| `conversation[].id` | `commentId`, plus the `prId` |
-
-A review body and a conversation comment have no thread to reply into. That is why each one takes the `prId`. A review body carries a vote, and the user's vote, the same way a comment does.
+A review body and a conversation comment have no thread to reply into. That is why each one takes the `prId`, as **Applying, voting and replying** below sets out. A review body carries a vote, and the user's vote, the same way a comment does.
 
 `userVotes` marks the comments the user voted on. The next section weighs them. `isBot` is true where a GitHub App wrote the comment, and **What the vote means** turns on it. An automated reviewer that runs on a machine user account comes back false, so read the author too.
 
@@ -74,30 +65,18 @@ It sends every reply at once. Then it sends every vote and resolve at once. Two 
 
 Resolve every thread you replied to, the pushed-back ones included. A thread that has come back gets `"resolve": true` again. Only one thread stays open, the case named in **Votes the user left**: the user voted a comment down and the claim holds up anyway. You cannot resolve a conversation comment, so the reply and the vote close it.
 
-One object per piece of feedback:
+One object per piece of feedback, `ref` naming the row the summary table will use:
 
 ```json
-[
-  { "ref": "useFoo.ts:24",
-    "threadId": "PRRT_kwDO...",
-    "commentId": "PRRC_kwDO...",
-    "bodyFile": "/tmp/reply-usefoo.md",
-    "vote": "THUMBS_UP",
-    "resolve": true },
-  { "ref": "review body (alice)",
-    "prId": "PR_kwDO...",
-    "commentId": "PRR_kwDO...",
-    "bodyFile": "/tmp/reply-alice.md",
-    "vote": "THUMBS_DOWN" }
-]
+[{ "ref": "useFoo.ts:24", "threadId": "PRRT_kwDO...", "commentId": "PRRC_kwDO...",
+   "bodyFile": "/tmp/reply-usefoo.md", "vote": "THUMBS_UP", "resolve": true }]
 ```
 
-- `ref` labels the row in the output. Use the name the summary table will use.
+`apply.ts` rejects a malformed plan and says exactly what is wrong with it, so run it and read the error rather than checking the shape by hand. What it cannot catch from the shape alone:
+
 - `threadId` replies into an inline thread. `prId` posts a new conversation comment instead, which is how a review body and a conversation comment get answered. Open those bodies with the author's `@login`. Give exactly one of the two.
 - `commentId` is what the vote lands on: the first comment in the thread, or the review or conversation node itself. Never your own reply.
 - `bodyFile` is a path, never the body itself. A double-quoted body runs every backticked identifier as a command and strips the code references out of the reply. Write the reply to a file whatever it contains. Do not judge that case by case.
-- `vote` is `THUMBS_UP` or `THUMBS_DOWN`. Leave it out for no vote.
-- `resolve` defaults to false. A thread you mean to close needs `"resolve": true` on it.
 
 ## What the vote means
 
