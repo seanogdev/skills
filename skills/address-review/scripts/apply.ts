@@ -146,7 +146,7 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
     item.resolve ? retry(() => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
   ]);
 
-  const record = (key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) => {
+  function record(key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) {
     if (!wanted) return;
     if (settled.status === 'fulfilled') {
       out[key] = 'ok';
@@ -154,7 +154,7 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
     }
     out[key] = 'failed';
     out.err = [out.err, errText(settled.reason)].filter(Boolean).join('; ');
-  };
+  }
   record('vote', vote, item.vote);
   record('resolve', resolve, item.resolve);
 
