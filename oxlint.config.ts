@@ -35,6 +35,7 @@ export default defineConfig({
     'no-undefined': 'off',
     'no-underscore-dangle': ['warn', { allow: ['_embedded'] }],
     'no-void': 'off',
+    'one-var': 'off',
     'require-await': 'off',
     'sort-imports': 'off',
     'typescript/explicit-function-return-type': 'off',

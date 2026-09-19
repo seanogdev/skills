@@ -4,16 +4,17 @@
 
 import { api, die } from './lib.ts';
 
-const argv = process.argv.slice(2),
-  dryRun = argv[0] === '--dry-run',
-  url = dryRun ? argv[1] : argv[0];
+const argv = process.argv.slice(2);
+const dryRun = argv[0] === '--dry-run';
+const url = dryRun ? argv[1] : argv[0];
 if (!url || url === '-h' || url === '--help') die('unvote.ts', 'usage: unvote.ts [--dry-run] COMMENT_URL');
 
-const owner = url.split('/')[3],
-  repo = url.split('/')[4],
-  frag = url.split('#')[1] ?? '';
+const owner = url.split('/')[3];
+const repo = url.split('/')[4];
+const frag = url.split('#')[1] ?? '';
 
-let kind: string, id: string;
+let kind: string;
+let id: string;
 if (frag.startsWith('discussion_r')) {
   kind = 'pulls/comments';
   id = frag.slice('discussion_r'.length);
@@ -32,11 +33,11 @@ if (!owner || !repo || !id!) die('unvote.ts', `cannot parse ${url}`);
 
 // removeReaction returns FORBIDDEN on this account, so this goes over REST,
 // which takes REST ids rather than node ids.
-const me = await api(['user'], '.login'),
-  found = await api(
-    [`repos/${owner}/${repo}/${kind!}/${id!}/reactions`],
-    `.[] | select(.user.login == "${me}") | select(.content == "+1" or .content == "-1") | "\\(.id)\\t\\(.content)"`,
-  );
+const me = await api(['user'], '.login');
+const found = await api(
+  [`repos/${owner}/${repo}/${kind!}/${id!}/reactions`],
+  `.[] | select(.user.login == "${me}") | select(.content == "+1" or .content == "-1") | "\\(.id)\\t\\(.content)"`,
+);
 
 if (!found) {
   console.log(`No vote from ${me} on ${url}`);

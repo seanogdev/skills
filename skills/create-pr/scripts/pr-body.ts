@@ -10,27 +10,31 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-const run = promisify(execFile),
-  die = (msg: string): never => {
-    console.error(`pr-body.ts: ${msg}`);
-    process.exit(2);
-  },
-  errText = (e: unknown): string => {
-    const x = e as { stderr?: string; stdout?: string; message?: string };
-    return (x.stderr || x.stdout || x.message || String(e)).trim();
-  },
-  // `gh` appends a newline that would grow the body by a blank line on every run.
-  chompOne = (s: string): string => (s.endsWith('\n') ? s.slice(0, -1) : s),
-  ATTACHMENT = /https:\/\/[^ )">]*(?:user-attachments|githubusercontent)[^ )">]*/g,
-  attachments = (body: string): string[] => [...new Set(body.match(ATTACHMENT) ?? [])].sort(),
-  [, , cmdArg, ...rest] = process.argv;
+const run = promisify(execFile);
+
+const die = (msg: string): never => {
+  console.error(`pr-body.ts: ${msg}`);
+  process.exit(2);
+};
+
+const errText = (e: unknown): string => {
+  const x = e as { stderr?: string; stdout?: string; message?: string };
+  return (x.stderr || x.stdout || x.message || String(e)).trim();
+};
+
+// `gh` appends a newline that would grow the body by a blank line on every run.
+const chompOne = (s: string): string => (s.endsWith('\n') ? s.slice(0, -1) : s);
+const ATTACHMENT = /https:\/\/[^ )">]*(?:user-attachments|githubusercontent)[^ )">]*/g;
+const attachments = (body: string): string[] => [...new Set(body.match(ATTACHMENT) ?? [])].sort();
+
+const [, , cmdArg, ...rest] = process.argv;
 if (!cmdArg || cmdArg === '-h' || cmdArg === '--help') {
   console.log('Usage: pr-body.ts save [PR]\n       pr-body.ts check NEW.md [PR]\n       pr-body.ts edit  NEW.md [PR]');
   process.exit(0);
 }
 
-let newFile = '',
-  pr = '';
+let newFile = '';
+let pr = '';
 if (cmdArg === 'save') {
   pr = rest[0] ?? '';
 } else if (cmdArg === 'check' || cmdArg === 'edit') {
@@ -41,15 +45,16 @@ if (cmdArg === 'save') {
   die(`unknown command '${cmdArg}'. One of save, check, edit.`);
 }
 
-const newBody = newFile ? await readFile(newFile, 'utf8').catch(() => die(`no such body file: ${newFile}`)) : '',
-  body = chompOne(
-    await run(
-      'gh',
-      pr ? ['pr', 'view', pr, '--json', 'body', '-q', '.body'] : ['pr', 'view', '--json', 'body', '-q', '.body'],
-    )
-      .then((r) => r.stdout)
-      .catch((error) => die(`cannot read PR '${pr || '(current branch)'}': ${errText(error)}`)),
-  );
+const newBody = newFile ? await readFile(newFile, 'utf8').catch(() => die(`no such body file: ${newFile}`)) : '';
+
+const body = chompOne(
+  await run(
+    'gh',
+    pr ? ['pr', 'view', pr, '--json', 'body', '-q', '.body'] : ['pr', 'view', '--json', 'body', '-q', '.body'],
+  )
+    .then((r) => r.stdout)
+    .catch((error) => die(`cannot read PR '${pr || '(current branch)'}': ${errText(error)}`)),
+);
 
 if (cmdArg === 'save') {
   process.stdout.write(body);
@@ -72,8 +77,8 @@ if (cmdArg === 'check') {
   process.exit(0);
 }
 
-const dir = await mkdtemp(join(tmpdir(), 'pr-body-')),
-  tmp = join(dir, 'body.md');
+const dir = await mkdtemp(join(tmpdir(), 'pr-body-'));
+const tmp = join(dir, 'body.md');
 try {
   await writeFile(tmp, chompOne(newBody));
   await run('gh', pr ? ['pr', 'edit', pr, '--body-file', tmp] : ['pr', 'edit', '--body-file', tmp]).catch((error) =>

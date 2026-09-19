@@ -30,29 +30,31 @@ interface Result {
   err: string;
 }
 
-const JOBS = Number(process.env.ADDRESS_REVIEW_JOBS) || 4,
-  Q = {
-    comment: `mutation($subjectId:ID!, $body:String!) {
+const JOBS = Number(process.env.ADDRESS_REVIEW_JOBS) || 4;
+
+const Q = {
+  comment: `mutation($subjectId:ID!, $body:String!) {
     addComment(input: {subjectId: $subjectId, body: $body}) { commentEdge { node { url } } }
   }`,
-    resolve: `mutation($threadId:ID!) {
+  resolve: `mutation($threadId:ID!) {
     resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
   }`,
-    vote: `mutation($subjectId:ID!, $content:ReactionContent!) {
+  vote: `mutation($subjectId:ID!, $content:ReactionContent!) {
     addReaction(input: {subjectId: $subjectId, content: $content}) { reaction { content } }
   }`,
-  },
-  Q_EXISTING = {
-    pr: `query($id:ID!) {
+};
+
+const Q_EXISTING = {
+  pr: `query($id:ID!) {
     node(id:$id) { ... on PullRequest {
       comments(last:50) { nodes { author { login } body url } } } }
   }`,
-    thread: `query($id:ID!) {
+  thread: `query($id:ID!) {
     node(id:$id) { ... on PullRequestReviewThread {
       comments(first:50) { nodes { databaseId author { login } body url } }
       pullRequest { number repository { nameWithOwner } } } }
   }`,
-  };
+};
 
 interface Comment {
   databaseId?: number;
@@ -62,27 +64,29 @@ interface Comment {
 }
 
 const duplicateOf = (nodes: Comment[], body: string, viewer: string) =>
-    nodes.find((n) => n.author?.login === viewer && n.body.trim() === body.trim())?.url,
-  // A reply is the one call here that is not idempotent, so re-running a plan
-  // would post it twice. This read looks for it, and doubles as the source of the
-  // REST coordinates the reply needs.
-  readThread = async (threadId: string) => {
-    const raw = await gql(Q_EXISTING.thread, ['-f', `id=${threadId}`], '.data.node'),
-      node: {
-        comments: { nodes: Comment[] };
-        pullRequest: { number: number; repository: { nameWithOwner: string } };
-      } = JSON.parse(raw);
-    return {
-      comments: node.comments.nodes,
-      number: node.pullRequest.number,
-      replyTo: node.comments.nodes[0]?.databaseId,
-      repo: node.pullRequest.repository.nameWithOwner,
-    };
-  },
-  readConversation = async (prId: string): Promise<Comment[]> => {
-    const raw = await gql(Q_EXISTING.pr, ['-f', `id=${prId}`], '.data.node.comments.nodes');
-    return JSON.parse(raw || '[]');
+  nodes.find((n) => n.author?.login === viewer && n.body.trim() === body.trim())?.url;
+
+// A reply is the one call here that is not idempotent, so re-running a plan
+// would post it twice. This read looks for it, and doubles as the source of the
+// REST coordinates the reply needs.
+const readThread = async (threadId: string) => {
+  const raw = await gql(Q_EXISTING.thread, ['-f', `id=${threadId}`], '.data.node');
+  const node: {
+    comments: { nodes: Comment[] };
+    pullRequest: { number: number; repository: { nameWithOwner: string } };
+  } = JSON.parse(raw);
+  return {
+    comments: node.comments.nodes,
+    number: node.pullRequest.number,
+    replyTo: node.comments.nodes[0]?.databaseId,
+    repo: node.pullRequest.repository.nameWithOwner,
   };
+};
+
+const readConversation = async (prId: string): Promise<Comment[]> => {
+  const raw = await gql(Q_EXISTING.pr, ['-f', `id=${prId}`], '.data.node.comments.nodes');
+  return JSON.parse(raw || '[]');
+};
 
 async function postReply(item: PlanItem, viewer: string, out: Result): Promise<void> {
   if (!item.bodyFile) return;
@@ -90,8 +94,8 @@ async function postReply(item: PlanItem, viewer: string, out: Result): Promise<v
 
   try {
     if (item.threadId) {
-      const thread = await readThread(item.threadId),
-        existing = duplicateOf(thread.comments, body, viewer);
+      const thread = await readThread(item.threadId);
+      const existing = duplicateOf(thread.comments, body, viewer);
       if (existing) {
         out.reply = 'duplicate';
         out.replyUrl = existing;
@@ -136,20 +140,21 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
 
   // Both are idempotent, so both retry, and neither waits on the other.
   const [vote, resolve] = await Promise.allSettled([
-      item.vote
-        ? retry(() => gql(Q.vote, ['-f', `subjectId=${item.commentId}`, '-f', `content=${item.vote}`]))
-        : Promise.resolve(null),
-      item.resolve ? retry(() => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
-    ]),
-    record = (key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) => {
-      if (!wanted) return;
-      if (settled.status === 'fulfilled') {
-        out[key] = 'ok';
-        return;
-      }
-      out[key] = 'failed';
-      out.err = [out.err, errText(settled.reason)].filter(Boolean).join('; ');
-    };
+    item.vote
+      ? retry(() => gql(Q.vote, ['-f', `subjectId=${item.commentId}`, '-f', `content=${item.vote}`]))
+      : Promise.resolve(null),
+    item.resolve ? retry(() => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
+  ]);
+
+  const record = (key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) => {
+    if (!wanted) return;
+    if (settled.status === 'fulfilled') {
+      out[key] = 'ok';
+      return;
+    }
+    out[key] = 'failed';
+    out.err = [out.err, errText(settled.reason)].filter(Boolean).join('; ');
+  };
   record('vote', vote, item.vote);
   record('resolve', resolve, item.resolve);
 
@@ -186,23 +191,26 @@ function validate(plan: PlanItem[]): string[] {
 }
 
 const table = (rows: string[][], head: string[]): string => {
-    const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length))),
-      line = (cells: string[]) =>
-        cells
-          .map((c, i) => c.padEnd(w[i]))
-          .join('  ')
-          .trimEnd();
-    return [line(head), ...rows.map(line)].join('\n');
-  },
-  target = process.argv[2];
+  const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
+  const line = (cells: string[]) =>
+    cells
+      .map((c, i) => c.padEnd(w[i]))
+      .join('  ')
+      .trimEnd();
+  return [line(head), ...rows.map(line)].join('\n');
+};
+
+const target = process.argv[2];
 if (!target || target === '-h' || target === '--help') die('usage: apply.ts PLAN.json');
 
 const readStdin = async (): Promise<string> => {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-    return Buffer.concat(chunks).toString('utf8');
-  },
-  raw = target === '-' ? await readStdin() : await readFile(target, 'utf8').catch(() => die(`no such plan: ${target}`));
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString('utf8');
+};
+
+const raw =
+  target === '-' ? await readStdin() : await readFile(target, 'utf8').catch(() => die(`no such plan: ${target}`));
 
 let plan: PlanItem[];
 try {
@@ -231,18 +239,19 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const viewer = await gql('{ viewer { login } }', [], '.data.viewer.login'),
-  results: Result[] = plan!.map((item) => ({
-    err: '',
-    ref: item.ref,
-    reply: 'skipped',
-    replyUrl: '',
-    resolve: 'skipped',
-    vote: 'skipped',
-  })),
-  // Every reply goes out, then every vote and resolve. Rounds, not per item, so a
-  // vote never lands on a thread ahead of the reply that explains it.
-  pairs = plan!.map((item, i) => [item, results[i]] as const);
+const viewer = await gql('{ viewer { login } }', [], '.data.viewer.login');
+const results: Result[] = plan!.map((item) => ({
+  err: '',
+  ref: item.ref,
+  reply: 'skipped',
+  replyUrl: '',
+  resolve: 'skipped',
+  vote: 'skipped',
+}));
+
+// Every reply goes out, then every vote and resolve. Rounds, not per item, so a
+// vote never lands on a thread ahead of the reply that explains it.
+const pairs = plan!.map((item, i) => [item, results[i]] as const);
 await pool(pairs, JOBS, ([item, out]) => postReply(item, viewer, out));
 await pool(pairs, JOBS, ([item, out]) => voteAndResolve(item, out));
 
