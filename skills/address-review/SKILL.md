@@ -2,7 +2,7 @@
 name: address-review
 description: Take every comment in a code review to a conclusion, on a GitHub PR or on a local review. Use when a review has landed and the user says "address the review", "fix the review comments", "respond to the comments", "handle this review", "work through the feedback", "get the comments sorted", or points at existing review feedback, flagged issues, or PR comments to resolve. Not for opening a new PR, writing its initial description, or giving a first review.
 license: MIT
-argument-hint: "[PR number, url or branch, or a path to a review file]"
+argument-hint: '[PR number, url or branch, or a path to a review file]'
 ---
 
 Take every item of live feedback to a conclusion. Fix it, or push back on it. Then account for the whole pass to the user. On a PR, also reply either way, vote on the comment, and resolve the thread. Inline threads are only one of three places feedback arrives.
@@ -95,11 +95,11 @@ The summary goes to the user. It is the last thing the pass produces. Write it o
 
 Lead with a table, one row per piece of feedback, in query order:
 
-| Comment | Outcome | Change |
-| --- | --- | --- |
-| [`useFoo.ts:24`](COMMENT_URL) | Fixed | Moved the normalisation into the transformer (`a1b2c3d`) |
-| [`Bar.vue:88`](COMMENT_URL) | Declined | The null guard on line 24 already covers it |
-| [`Baz.ts:12`](COMMENT_URL) | Out of scope | Tracked in #418 |
+| Comment                       | Outcome      | Change                                                   |
+| ----------------------------- | ------------ | -------------------------------------------------------- |
+| [`useFoo.ts:24`](COMMENT_URL) | Fixed        | Moved the normalisation into the transformer (`a1b2c3d`) |
+| [`Bar.vue:88`](COMMENT_URL)   | Declined     | The null guard on line 24 already covers it              |
+| [`Baz.ts:12`](COMMENT_URL)    | Out of scope | Tracked in #418                                          |
 
 How to fill it in:
 

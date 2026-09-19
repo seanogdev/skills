@@ -67,9 +67,9 @@ line:
 <details>
 <summary>Files changed in <code>src/api/</code></summary>
 
-| File | Change |
-| ---- | ------ |
-| `client.ts` | Added the retry wrapper |
+| File             | Change                      |
+| ---------------- | --------------------------- |
+| `client.ts`      | Added the retry wrapper     |
 | `client.test.ts` | Covers the new backoff path |
 
 </details>

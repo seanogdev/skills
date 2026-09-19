@@ -68,8 +68,16 @@ Resolve every thread you replied to, the pushed-back ones included. A thread tha
 One object per piece of feedback, `ref` naming the row the summary table will use:
 
 ```json
-[{ "ref": "useFoo.ts:24", "threadId": "PRRT_kwDO...", "commentId": "PRRC_kwDO...",
-   "bodyFile": "/tmp/reply-usefoo.md", "vote": "THUMBS_UP", "resolve": true }]
+[
+  {
+    "ref": "useFoo.ts:24",
+    "threadId": "PRRT_kwDO...",
+    "commentId": "PRRC_kwDO...",
+    "bodyFile": "/tmp/reply-usefoo.md",
+    "vote": "THUMBS_UP",
+    "resolve": true
+  }
+]
 ```
 
 `apply.ts` rejects a malformed plan and says exactly what is wrong with it, so run it and read the error rather than checking the shape by hand. What it cannot catch from the shape alone:
