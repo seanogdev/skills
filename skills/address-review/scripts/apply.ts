@@ -270,11 +270,13 @@ try {
     vote: 'skipped',
   }));
 
-  // Every reply goes out, then every vote and resolve. Rounds, not per item, so a
-  // vote never lands on a thread ahead of the reply that explains it.
+  // Reply then vote/resolve, per item, so a vote never lands ahead of the reply
+  // that explains it, without making every item wait for the slowest reply.
   const pairs = plan!.map((item, i) => [item, results[i]] as const);
-  await pool(pairs, JOBS, async ([item, out]) => postReply(item, viewer, out));
-  await pool(pairs, JOBS, async ([item, out]) => voteAndResolve(item, out));
+  await pool(pairs, JOBS, async ([item, out]) => {
+    await postReply(item, viewer, out);
+    await voteAndResolve(item, out);
+  });
 
   console.log(
     table(
