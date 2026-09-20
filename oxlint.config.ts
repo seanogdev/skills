@@ -21,7 +21,7 @@ export default defineConfig({
       },
     },
   ],
-  plugins: ['eslint', 'import', 'oxc', 'promise', 'typescript', 'unicorn'],
+  plugins: ['typescript', 'unicorn', 'oxc', 'import', 'promise'],
   rules: {
     'capitalized-comments': 'off',
     complexity: ['error', { max: 10 }],
