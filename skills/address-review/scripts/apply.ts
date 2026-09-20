@@ -4,9 +4,11 @@
 
 import { readFile } from 'node:fs/promises';
 
-import { api, die as dieBase, errText, gql, retry } from './lib.ts';
+import { api, die as dieBase, DieError, errText, gql, retry } from './lib.ts';
 
-const die = (msg: string): never => dieBase('apply.ts', msg);
+function die(msg: string): never {
+  return dieBase('apply.ts', msg);
+}
 
 type Vote = 'THUMBS_UP' | 'THUMBS_DOWN';
 type State = 'ok' | 'failed' | 'skipped' | 'duplicate';
@@ -63,30 +65,31 @@ interface Comment {
   url: string;
 }
 
-const duplicateOf = (nodes: Comment[], body: string, viewer: string) =>
-  nodes.find((n) => n.author?.login === viewer && n.body.trim() === body.trim())?.url;
+function duplicateOf(nodes: Comment[], body: string, viewer: string) {
+  return nodes.find((n) => n.author?.login === viewer && n.body.trim() === body.trim())?.url;
+}
 
 // A reply is the one call here that is not idempotent, so re-running a plan
 // would post it twice. This read looks for it, and doubles as the source of the
 // REST coordinates the reply needs.
-const readThread = async (threadId: string) => {
+async function readThread(threadId: string) {
   const raw = await gql(Q_EXISTING.thread, ['-f', `id=${threadId}`], '.data.node');
-  const node: {
+  const node = JSON.parse(raw) as {
     comments: { nodes: Comment[] };
     pullRequest: { number: number; repository: { nameWithOwner: string } };
-  } = JSON.parse(raw);
+  };
   return {
     comments: node.comments.nodes,
     number: node.pullRequest.number,
     replyTo: node.comments.nodes[0]?.databaseId,
     repo: node.pullRequest.repository.nameWithOwner,
   };
-};
+}
 
-const readConversation = async (prId: string): Promise<Comment[]> => {
+async function readConversation(prId: string): Promise<Comment[]> {
   const raw = await gql(Q_EXISTING.pr, ['-f', `id=${prId}`], '.data.node.comments.nodes');
-  return JSON.parse(raw || '[]');
-};
+  return JSON.parse(raw || '[]') as Comment[];
+}
 
 async function postReply(item: PlanItem, viewer: string, out: Result): Promise<void> {
   if (!item.bodyFile) return;
@@ -142,8 +145,8 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
   const [vote, resolve] = await Promise.allSettled([
     item.vote
       ? retry(async () => gql(Q.vote, ['-f', `subjectId=${item.commentId}`, '-f', `content=${item.vote}`]))
-      : Promise.resolve(null),
-    item.resolve ? retry(async () => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(null),
+      : Promise.resolve(),
+    item.resolve ? retry(async () => gql(Q.resolve, ['-f', `threadId=${item.threadId}`])) : Promise.resolve(),
   ]);
 
   function record(key: 'vote' | 'resolve', settled: PromiseSettledResult<unknown>, wanted: unknown) {
@@ -164,12 +167,14 @@ async function voteAndResolve(item: PlanItem, out: Result): Promise<Result> {
 async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = Array.from({ length: items.length });
   let next = 0;
-  const worker = async () => {
+  async function worker() {
     while (next < items.length) {
-      const i = next++;
+      const i = next;
+      next += 1;
+      // eslint-disable-next-line no-await-in-loop -- one job at a time per worker; concurrency comes from running several workers
       results[i] = await fn(items[i]);
     }
-  };
+  }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
 }
@@ -190,87 +195,108 @@ function validate(plan: PlanItem[]): string[] {
   });
 }
 
-const table = (rows: string[][], head: string[]): string => {
+function table(rows: string[][], head: string[]): string {
   const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
-  const line = (cells: string[]) =>
-    cells
+  function line(cells: string[]) {
+    return cells
       .map((c, i) => c.padEnd(w[i]))
       .join('  ')
       .trimEnd();
-  return [line(head), ...rows.map(line)].join('\n');
-};
+  }
+  return [line(head), ...rows.map((r) => line(r))].join('\n');
+}
 
-const target = process.argv[2];
-if (!target || target === '-h' || target === '--help') die('usage: apply.ts PLAN.json');
-
-const readStdin = async (): Promise<string> => {
+async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString('utf8');
-};
+}
 
-const raw =
-  target === '-' ? await readStdin() : await readFile(target, 'utf8').catch(() => die(`no such plan: ${target}`));
-
-let plan: PlanItem[];
+// die() throws; this is the one place that turns it into the process exit a
+// CLI entrypoint is allowed to make directly (unicorn/no-process-exit only
+// flags exits buried inside library functions, not top-level script code).
 try {
-  plan = JSON.parse(raw);
-} catch (error) {
-  die(`plan is not valid JSON: ${(error as Error).message}`);
-}
-if (!Array.isArray(plan!) || plan!.length === 0) die('plan must be a non-empty JSON array');
+  // eslint-disable-next-line prefer-destructuring -- destructuring argv[2] needs two ignored slots, less readable than an index
+  const target = process.argv[2];
+  if (!target || target === '-h' || target === '--help') die('usage: apply.ts PLAN.json');
 
-// Validate the whole plan before sending anything. A plan that fails halfway is
-// the expensive failure, so every check happens up front.
-const errors = validate(plan!);
-if (errors.length > 0) {
-  console.error(`apply.ts: invalid plan\n  ${errors.join('\n  ')}`);
-  process.exit(2);
-}
+  let raw: string;
+  if (target === '-') {
+    raw = await readStdin();
+  } else {
+    try {
+      raw = await readFile(target, 'utf8');
+    } catch {
+      die(`no such plan: ${target}`);
+    }
+  }
 
-const missing: string[] = [];
-for (const item of plan!) {
-  if (!item.bodyFile) continue;
-  const body = await readFile(item.bodyFile, 'utf8').catch(() => null);
-  if (!body || !body.trim()) missing.push(item.bodyFile);
-}
-if (missing.length > 0) {
-  console.error(`apply.ts: missing or empty body files\n  ${missing.join('\n  ')}`);
-  process.exit(2);
-}
+  let plan: PlanItem[];
+  try {
+    plan = JSON.parse(raw) as PlanItem[];
+  } catch (error) {
+    die(`plan is not valid JSON: ${(error as Error).message}`);
+  }
+  if (!Array.isArray(plan!) || plan!.length === 0) die('plan must be a non-empty JSON array');
 
-const viewer = await gql('{ viewer { login } }', [], '.data.viewer.login');
-const results: Result[] = plan!.map((item) => ({
-  err: '',
-  ref: item.ref,
-  reply: 'skipped',
-  replyUrl: '',
-  resolve: 'skipped',
-  vote: 'skipped',
-}));
+  // Validate the whole plan before sending anything. A plan that fails halfway is
+  // the expensive failure, so every check happens up front.
+  const errors = validate(plan!);
+  if (errors.length > 0) die(`invalid plan\n  ${errors.join('\n  ')}`);
 
-// Every reply goes out, then every vote and resolve. Rounds, not per item, so a
-// vote never lands on a thread ahead of the reply that explains it.
-const pairs = plan!.map((item, i) => [item, results[i]] as const);
-await pool(pairs, JOBS, async ([item, out]) => postReply(item, viewer, out));
-await pool(pairs, JOBS, async ([item, out]) => voteAndResolve(item, out));
-
-console.log(
-  table(
-    results.map((r) => [r.ref, r.reply, r.vote, r.resolve]),
-    ['REF', 'REPLY', 'VOTE', 'RESOLVE'],
-  ),
-);
-
-const landed = results.filter((r) => r.replyUrl);
-if (landed.length > 0) console.log(`\n${landed.map((r) => `${r.ref}  ${r.replyUrl}`).join('\n')}`);
-
-const failed = results.filter((r) => [r.reply, r.vote, r.resolve].includes('failed'));
-if (failed.length > 0) {
-  console.error(`\n${failed.length} item(s) failed:`);
-  for (const r of failed) console.error(`  ${r.ref}: ${r.err}`);
-  console.error(
-    '\nA failed reply sends no vote and no resolve. Re-read those threads before retrying: GitHub sometimes posts a reply and then fails the response.',
+  const bodyFileChecks = await pool(
+    plan!.filter((item) => item.bodyFile),
+    JOBS,
+    async (item) => {
+      let body: string | undefined;
+      try {
+        body = await readFile(item.bodyFile!, 'utf8');
+      } catch {
+        body = undefined;
+      }
+      return !body || !body.trim() ? item.bodyFile : undefined;
+    },
   );
-  process.exit(1);
+  const missing = bodyFileChecks.filter((bodyFile): bodyFile is string => Boolean(bodyFile));
+  if (missing.length > 0) die(`missing or empty body files\n  ${missing.join('\n  ')}`);
+
+  const viewer = await gql('{ viewer { login } }', [], '.data.viewer.login');
+  const results: Result[] = plan!.map((item) => ({
+    err: '',
+    ref: item.ref,
+    reply: 'skipped',
+    replyUrl: '',
+    resolve: 'skipped',
+    vote: 'skipped',
+  }));
+
+  // Every reply goes out, then every vote and resolve. Rounds, not per item, so a
+  // vote never lands on a thread ahead of the reply that explains it.
+  const pairs = plan!.map((item, i) => [item, results[i]] as const);
+  await pool(pairs, JOBS, async ([item, out]) => postReply(item, viewer, out));
+  await pool(pairs, JOBS, async ([item, out]) => voteAndResolve(item, out));
+
+  console.log(
+    table(
+      results.map((r) => [r.ref, r.reply, r.vote, r.resolve]),
+      ['REF', 'REPLY', 'VOTE', 'RESOLVE'],
+    ),
+  );
+
+  const landed = results.filter((r) => r.replyUrl);
+  if (landed.length > 0) console.log(`\n${landed.map((r) => `${r.ref}  ${r.replyUrl}`).join('\n')}`);
+
+  const failed = results.filter((r) => [r.reply, r.vote, r.resolve].includes('failed'));
+  if (failed.length > 0) {
+    console.error(`\n${failed.length} item(s) failed:`);
+    for (const r of failed) console.error(`  ${r.ref}: ${r.err}`);
+    console.error(
+      '\nA failed reply sends no vote and no resolve. Re-read those threads before retrying: GitHub sometimes posts a reply and then fails the response.',
+    );
+    process.exit(1);
+  }
+} catch (error) {
+  if (!(error instanceof DieError)) throw error;
+  console.error(error.message);
+  process.exit(2);
 }
