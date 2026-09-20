@@ -13,13 +13,21 @@ export default defineConfig({
     es2022: true,
     node: true,
   },
-  plugins: ['typescript', 'unicorn'],
+  overrides: [
+    {
+      files: ['**/scripts/*.ts'],
+      rules: {
+        'no-console': 'off',
+      },
+    },
+  ],
+  plugins: ['promise', 'typescript', 'unicorn'],
   rules: {
     'capitalized-comments': 'off',
     complexity: ['error', { max: 10 }],
     curly: 'off',
     'func-names': 'off',
-    'func-style': ['warn', 'declaration', { allowArrowFunctions: true }],
+    'func-style': ['warn', 'declaration'],
     'id-length': 'off',
     'import/extensions': 'error',
     'init-declarations': 'off',
@@ -36,6 +44,7 @@ export default defineConfig({
     'no-underscore-dangle': ['warn', { allow: ['_embedded'] }],
     'no-void': 'off',
     'one-var': 'off',
+    'promise/prefer-await-to-then': 'warn',
     'require-await': 'off',
     'sort-imports': 'off',
     'typescript/explicit-function-return-type': 'off',
