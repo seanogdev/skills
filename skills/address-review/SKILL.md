@@ -5,7 +5,7 @@ license: MIT
 argument-hint: '[PR number, url or branch, or a path to a review file]'
 ---
 
-Take every item of live feedback to a conclusion. Fix it, or push back on it. Then account for the whole pass to the user. On a PR, also reply either way, vote on the comment, and resolve the thread. Inline threads are only one of three places feedback arrives.
+Take every item of live feedback to a conclusion. Fix it, or push back on it. Then account for the whole pass to the user. On a PR, also reply either way, vote on the comment, and resolve the thread.
 
 ## Where the feedback is
 
@@ -30,8 +30,6 @@ Then read the file for that mode before you do anything else. Each path in this 
 The mode file holds the rules this file does not repeat.
 
 ## Deciding
-
-The goal is the right call on each comment. Agreeing and disagreeing are both fine outcomes. Neither one is the target.
 
 Check the claim before you act on it. Read the surrounding file, not only the diff hunk. If a comment describes a bug, trace the path that produces it. A reviewer who works from a hunk in isolation sometimes flags something the wider file already handles. Apply the same standard whoever wrote the comment.
 
