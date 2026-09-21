@@ -165,9 +165,18 @@ is unfinished.
 once it is gone.
 
 ```bash
-./scripts/pr-body.ts save > /tmp/pr-body-before.md
-./scripts/pr-body.ts edit /tmp/pr-body-new.md
+./scripts/pr-body.ts save 23080 > /tmp/pr23080-body-before.md
+./scripts/pr-body.ts edit /tmp/pr23080-body-new.md 23080
 ```
+
+Put the PR number in each temporary file name, and give it to each command. Runs share `/tmp`. Under
+a fixed name such as `/tmp/pr-body-new.md`, a second run that works on a different PR overwrites the
+file, and the first run then posts that other PR's body, with that other PR's screenshots. The
+attachment guard permits this, because it compares the new body against the PR you name, not against
+the body you wrote.
+
+Before `edit`, confirm that the file holds the body of the PR that you name. Compare
+`gh pr view <PR> --json title` against the body, and read the body back after `edit`.
 
 `edit` refuses to write a body that drops an attachment the author added. It also strips the
 trailing newline `gh` adds, which otherwise grows the body by a blank line on every run. `check`
