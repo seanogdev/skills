@@ -41,6 +41,12 @@ helps.
 
 ## 5. Write the body
 
+Before you write a word, work out who reads this. Not you, not the diff. A reviewer who has not
+seen the branch, who is about to open the diff, and who needs the body to make sense of what they
+are about to read. Write the whole body for that person. Every rule below serves that one aim: a
+reviewer-friendly body. Where a rule and reviewer-friendliness pull apart, reviewer-friendliness
+wins.
+
 Look for a repository template first: `.github/pull_request_template.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`, or a file in `.github/PULL_REQUEST_TEMPLATE/`. If a template
 exists, fill it in. Fit the two sections below into it. Do not replace it.
