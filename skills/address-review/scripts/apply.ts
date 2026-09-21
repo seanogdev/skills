@@ -288,6 +288,21 @@ try {
   const landed = results.filter((r) => r.replyUrl);
   if (landed.length > 0) console.log(`\n${landed.map((r) => `${r.ref}  ${r.replyUrl}`).join('\n')}`);
 
+  // A reply that landed with no vote and no resolve is silent otherwise: this is
+  // the shape of a plan item that forgot both fields, not an error apply.ts can
+  // see. It is also the correct shape for a genuine "Asked" reply on an open
+  // question, so this warns rather than fails.
+  const silent = plan!
+    .map((item, i) => [item, results[i]] as const)
+    .filter(([item, r]) => item.threadId && r.reply === 'ok' && r.vote === 'skipped' && r.resolve === 'skipped');
+  if (silent.length > 0) {
+    console.error(`\n${silent.length} item(s) replied with no vote and no resolve:`);
+    for (const [item] of silent) console.error(`  ${item.ref}`);
+    console.error(
+      '\nCorrect for a question left open. Wrong for anything else: confirm each one before you write the summary.',
+    );
+  }
+
   const failed = results.filter((r) => [r.reply, r.vote, r.resolve].includes('failed'));
   if (failed.length > 0) {
     console.error(`\n${failed.length} item(s) failed:`);
