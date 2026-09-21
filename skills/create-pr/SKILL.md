@@ -182,6 +182,16 @@ Before `edit`, confirm that the file holds the body of the PR that you name. Com
 trailing newline `gh` adds, which otherwise grows the body by a blank line on every run. `check`
 runs the same guard and edits nothing.
 
+`save` also writes a baseline file named after the PR, and `check` and `edit` compare against that
+baseline, not against the live body. A body that another run has written over would otherwise make
+the guard defend that other PR's attachments and refuse the rightful body. `--baseline FILE` names a
+different baseline, and `--baseline none` compares against nothing.
+
+`check` and `edit` also stop when the live body holds an attachment the baseline does not. Somebody
+wrote to the PR after your `save`: either a person who added a screenshot, or a run that posted the
+wrong body there. Read the live body, then re-run `save` if it is right, or keep your baseline if it
+is not.
+
 Keep everything the skill does not own:
 
 - Image and video markup wherever it sits: `![alt](url)`, `<img ...>`, `<video ...>`, and bare
