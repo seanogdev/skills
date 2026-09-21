@@ -51,12 +51,15 @@ Look for a repository template first: `.github/pull_request_template.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`, or a file in `.github/PULL_REQUEST_TEMPLATE/`. If a template
 exists, fill it in. Fit the two sections below into it. Do not replace it.
 
-**Changes.** No yapping. One bullet holds one clause, one sentence at most. If a bullet needs a
-second sentence to justify itself, cut the justification, not the bullet. The diff, a code comment,
-or the file table carries it instead. A bullet that runs past one line is two bullets in disguise,
-or belongs in a `<details>` block under step "Collapse the bulk", not in `Changes`. Before you write
-the list, count the bullets. More than six or seven on an ordinary PR is a sign you are narrating
-file by file instead of summarising. Merge bullets or cut them until the list reads in ten seconds.
+**Changes.** No yapping. One bullet holds one idea. Count ideas, not sentences or periods: a
+semicolon or an `and` that joins two clauses which could each stand as their own bullet is two
+ideas, so split them into two bullets, or cut one. "X moves to Y; Z is dropped because W" is two
+facts joined into one line, not one fact. If a bullet needs a second clause to justify itself, cut
+the justification, not the bullet. The diff, a code comment, or the file table carries it instead. A
+bullet that runs past one line is two bullets in disguise, or belongs in a `<details>` block under
+step "Collapse the bulk", not in `Changes`. Before you write the list, count the bullets. More than
+six or seven on an ordinary PR is a sign you are narrating file by file instead of summarising.
+Merge bullets or cut them until the list reads in ten seconds.
 
 Within that budget: give each bullet the one thing the diff does not say. Then stop. Do not restate
 the diff. Do not repeat the title. Do not explain code the reviewer can read.
