@@ -46,15 +46,22 @@ Look for a repository template first: `.github/pull_request_template.md`,
 exists, fill it in. Fit the two sections below into it. Do not replace it.
 
 **Changes.** Write a top level bullet list that summarises the PR. Judge what the reviewer needs.
-Write a bullet only when the reviewer would miss something without it. Make each bullet as short as
-it can go without the loss of that thing. One bullet is correct when one thing changed. Do not pad
-the list to look thorough.
+Write a bullet only when the reviewer would miss something without it. One bullet is correct when
+one thing changed. Do not pad the list to look thorough.
 
 Write for a reviewer who is about to read the diff. Give each bullet the one thing the diff does not
 say. Then stop. Do not restate the diff. Do not repeat the title. Do not explain code the reviewer
 can read.
 
-Call a workaround a workaround. Give it a bullet that names the real fix.
+One bullet holds one clause, one sentence at most. If a bullet needs a second sentence to justify
+itself, cut the justification, not the bullet. The diff, a code comment, or the file table carries
+it instead. A bullet that runs past one line is two bullets in disguise, or belongs in a `<details>`
+block under step "Collapse the bulk", not in `Changes`. Before you write the list, count the bullets.
+More than six or seven on an ordinary PR is a sign you are narrating file by file instead of
+summarising. Merge bullets or cut them until the list reads in ten seconds.
+
+Call a workaround a workaround. Give it a bullet that names the real fix, not the chain of reasoning
+that led to it.
 
 **File table.** Write a collapsible table that covers every changed file. Add a very short note on
 how each file changed. Write a few words per cell, not a sentence.
