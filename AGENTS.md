@@ -13,5 +13,4 @@ skill so it works on any machine:
 - The `Skill` tool never reads this repo directly. It reads the installed copy under
   `~/.agents/skills/<name>`, which `gh skill` pins to a commit at install time. Editing a
   `SKILL.md` here, even after a push, changes nothing a subagent sees until that install is
-  refreshed. To test an edited skill, push it, then run
-  `gh skill update --dir ~/.agents/skills --all <name>` before invoking it.
+  refreshed. To test an edited skill, push it, then run `skills-update` before invoking it.
