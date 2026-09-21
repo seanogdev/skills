@@ -51,24 +51,26 @@ Look for a repository template first: `.github/pull_request_template.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`, or a file in `.github/PULL_REQUEST_TEMPLATE/`. If a template
 exists, fill it in. Fit the two sections below into it. Do not replace it.
 
-**Changes.** No yapping. One bullet holds one idea. Count ideas, not sentences or periods: a
-semicolon or an `and` that joins two clauses which could each stand as their own bullet is two
-ideas, so split them into two bullets, or cut one. "X moves to Y; Z is dropped because W" is two
-facts joined into one line, not one fact. If a bullet needs a second clause to justify itself, cut
-the justification, not the bullet. The diff, a code comment, or the file table carries it instead. A
-bullet that runs past one line is two bullets in disguise, or belongs in a `<details>` block under
-step "Collapse the bulk", not in `Changes`. Before you write the list, count the bullets. More than
-six or seven on an ordinary PR is a sign you are narrating file by file instead of summarising.
-Merge bullets or cut them until the list reads in ten seconds.
+**Changes.** No yapping. Judge a bullet by whether the reviewer gets its point on the first read, not
+by its word count. A short bullet that buries its point behind a caveat is unclear. A longer bullet
+that states one plain fact is fine. The failure to watch for: a bullet that sets two separate facts
+side by side, so the reviewer has to hold both before either one lands. Shortening the sentence does
+not fix that. Deciding which fact the bullet is for, stating that one plainly, and cutting the other
+does. Cut the second fact to the file table, a code comment, or nowhere, rather than gluing it on
+with a semicolon or an `and`. Splitting into a second bullet is not the default fix either. Add one
+only when the second fact is itself something the reviewer would miss without it.
 
-Within that budget: give each bullet the one thing the diff does not say. Then stop. Do not restate
-the diff. Do not repeat the title. Do not explain code the reviewer can read.
+Write for a reviewer about to read the diff. Give each bullet the one thing the diff does not say,
+stated as its own plain claim, not wrapped in the reasoning that led there. Do not restate the diff.
+Do not repeat the title. Do not explain code the reviewer can read.
 
-Judge what the reviewer needs. Write a bullet only when the reviewer would miss something without
-it. One bullet is correct when one thing changed. Do not pad the list to look thorough.
+Read the finished list back as a list, not bullet by bullet. More than six or seven bullets on an
+ordinary PR, or a bullet you found yourself explaining rather than stating, is a sign you are
+narrating file by file instead of summarising. Merge what belongs together. Cut what the file table
+already says.
 
-Call a workaround a workaround. Give it a bullet that names the real fix, not the chain of reasoning
-that led to it.
+Call a workaround a workaround. State the real fix as its own plain claim, not as the last link in a
+chain of reasoning.
 
 **File table.** Write a collapsible table that covers every changed file. Add a very short note on
 how each file changed. Write a few words per cell, not a sentence.
