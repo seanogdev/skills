@@ -9,6 +9,12 @@ license: MIT
 Each path in this skill is relative to the directory that holds this file. Expand it to a full path
 before you run a command.
 
+Before you touch any step below, work out who reads the PR you are about to open. Not you, not the
+diff. A reviewer who has not seen the branch, who is about to open the diff, and who needs the body
+to make sense of what they are about to read. Write the whole PR for that person. Every rule below
+serves that one aim: a reviewer-friendly PR. Where a rule and reviewer-friendliness pull apart,
+reviewer-friendliness wins.
+
 ## 1. Check the branch
 
 If the current branch is `main` or `master`, create a branch first. Never push to `main`.
@@ -41,30 +47,22 @@ helps.
 
 ## 5. Write the body
 
-Before you write a word, work out who reads this. Not you, not the diff. A reviewer who has not
-seen the branch, who is about to open the diff, and who needs the body to make sense of what they
-are about to read. Write the whole body for that person. Every rule below serves that one aim: a
-reviewer-friendly body. Where a rule and reviewer-friendliness pull apart, reviewer-friendliness
-wins.
-
 Look for a repository template first: `.github/pull_request_template.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`, or a file in `.github/PULL_REQUEST_TEMPLATE/`. If a template
 exists, fill it in. Fit the two sections below into it. Do not replace it.
 
-**Changes.** Write a top level bullet list that summarises the PR. Judge what the reviewer needs.
-Write a bullet only when the reviewer would miss something without it. One bullet is correct when
-one thing changed. Do not pad the list to look thorough.
+**Changes.** No yapping. One bullet holds one clause, one sentence at most. If a bullet needs a
+second sentence to justify itself, cut the justification, not the bullet. The diff, a code comment,
+or the file table carries it instead. A bullet that runs past one line is two bullets in disguise,
+or belongs in a `<details>` block under step "Collapse the bulk", not in `Changes`. Before you write
+the list, count the bullets. More than six or seven on an ordinary PR is a sign you are narrating
+file by file instead of summarising. Merge bullets or cut them until the list reads in ten seconds.
 
-Write for a reviewer who is about to read the diff. Give each bullet the one thing the diff does not
-say. Then stop. Do not restate the diff. Do not repeat the title. Do not explain code the reviewer
-can read.
+Within that budget: give each bullet the one thing the diff does not say. Then stop. Do not restate
+the diff. Do not repeat the title. Do not explain code the reviewer can read.
 
-One bullet holds one clause, one sentence at most. If a bullet needs a second sentence to justify
-itself, cut the justification, not the bullet. The diff, a code comment, or the file table carries
-it instead. A bullet that runs past one line is two bullets in disguise, or belongs in a `<details>`
-block under step "Collapse the bulk", not in `Changes`. Before you write the list, count the bullets.
-More than six or seven on an ordinary PR is a sign you are narrating file by file instead of
-summarising. Merge bullets or cut them until the list reads in ten seconds.
+Judge what the reviewer needs. Write a bullet only when the reviewer would miss something without
+it. One bullet is correct when one thing changed. Do not pad the list to look thorough.
 
 Call a workaround a workaround. Give it a bullet that names the real fix, not the chain of reasoning
 that led to it.
