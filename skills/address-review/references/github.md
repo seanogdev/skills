@@ -24,7 +24,7 @@ A review body and a conversation comment have no thread to reply into. That is w
 
 `userVotes` marks the comments the user voted on. The next section weighs them. `isBot` is true where a GitHub App wrote the comment, and **What the vote means** turns on it. An automated reviewer that runs on a machine user account comes back false, so read the author too.
 
-A review body often never becomes an inline thread. A reviewer often raises the main point in the conversation, not against a line. Those two are the easiest to miss.
+A reviewer often raises the main point in a review body or conversation comment, not against a line — those are the easiest to miss.
 
 ## Threads that have come back
 
@@ -88,7 +88,7 @@ One object per piece of feedback, `ref` naming the row the summary table will us
 
 ## What the vote means
 
-The vote records one thing: whether the comment should be addressed. It is not a verdict on the reviewer. It is not a score for how well the comment was written.
+The vote records only whether the comment should be addressed — not a judgment of the reviewer or the comment.
 
 `THUMBS_UP` and `THUMBS_DOWN` are the only two reactions this skill uses. Never send `LAUGH`, `HOORAY`, `CONFUSED`, `HEART`, `ROCKET` or `EYES`, whatever the comment says.
 
