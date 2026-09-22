@@ -99,6 +99,17 @@ wraps at the page width:
 - `src/api/client.ts`: added the retry wrapper
 ```
 
+**Focus areas.** Add this section only when part of the diff needs more care from the reviewer than
+the rest: a workaround, a judgment call, a change with no test behind it, a change to behaviour
+another part of the system relies on. Name the file and the reason, one line each. Skip the section
+when nothing in the diff stands out this way.
+
+```markdown
+## Focus areas
+
+- `src/api/client.ts`: retry count is a guess. No data backs the current value.
+```
+
 **Describe the state the branch is in.** This rule owns every section of the body, the repo
 template's sections included. It does not own the `Changes` bullets alone. How the session reached
 the current state is not the reviewer's concern. The reviewer reads the branch as it stands now. So
@@ -130,9 +141,9 @@ block. Give the block a summary line that says what is inside. That covers revie
 excerpt, a benchmark run and a long list. The file table above is the pattern. Keep the open part of
 the body short enough to read without a scroll.
 
-Add no heading the repo's template does not ask for. `Changes`, the file table and `Screenshots` are
-the whole of it. Add no `Testing`, `Motivation`, `Risks` or `Notes` section unless the template has
-one.
+Add no heading the repo's template does not ask for. `Changes`, the file table, `Focus areas` and
+`Screenshots` are the whole of it. Add no `Testing`, `Motivation`, `Risks` or `Notes` section unless
+the template has one.
 
 Leave a `## Screenshots` heading. Leave it empty unless step 7 fills it. Never write placeholder
 text into it.
