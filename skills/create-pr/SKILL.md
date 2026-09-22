@@ -104,10 +104,17 @@ the rest: a workaround, a judgment call, a change with no test behind it, a chan
 another part of the system relies on. Name the file and the reason, one line each. Skip the section
 when nothing in the diff stands out this way.
 
+Where two or more reasons share one file or one theme, write the file or theme as the top bullet and
+nest the reasons under it. A flat list that repeats the same file on separate lines makes the
+reviewer match them up itself.
+
 ```markdown
 ## Focus areas
 
-- `src/api/client.ts`: retry count is a guess. No data backs the current value.
+- `src/api/client.ts`
+  - Retry count is a guess. No data backs the current value.
+  - Backoff runs on the caller's thread. A slow retry blocks the request that triggered it.
+- `src/api/session.ts`: token refresh now races the request that triggered it.
 ```
 
 **Describe the state the branch is in.** This rule owns every section of the body, the repo
