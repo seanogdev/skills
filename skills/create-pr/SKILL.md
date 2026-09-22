@@ -49,7 +49,9 @@ helps.
 
 Look for a repository template first: `.github/pull_request_template.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`, or a file in `.github/PULL_REQUEST_TEMPLATE/`. If a template
-exists, fill it in. Fit the two sections below into it. Do not replace it.
+exists, fill it in. Fit the sections below into it; do not replace it. Slot each one under the
+template heading it matches in meaning, even where the wording differs. Where no heading matches,
+add the section as its own heading, placed where it reads best against the rest of the template.
 
 **Changes.** No yapping. Judge a bullet by whether the reviewer gets its point on the first read, not
 by its word count. A short bullet that buries its point behind a caveat is unclear. A longer bullet
