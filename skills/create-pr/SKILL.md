@@ -40,6 +40,11 @@ Where the repo has a skill that names those commands, follow it.
 If the repo uses changesets and the diff ships code, confirm that a `.changeset/` file covers it.
 Write one if it is absent. Follow the `changeset` skill for the wording.
 
+The summary describes the whole branch, not the session. Read it against `git diff <base>...HEAD`.
+Write it again when it describes one commit, a step you took, or a fix to something this branch
+added. On an existing PR, write it again when the diff changes what the PR does. Do not add a
+clause for each new commit.
+
 ## 4. Write the title
 
 Write one line in sentence case. Add a `docs:`, `fix:`, `refactor:` or `i18n:` prefix only when it
