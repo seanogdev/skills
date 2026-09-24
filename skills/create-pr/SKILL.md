@@ -38,12 +38,8 @@ Where the repo has a skill that names those commands, follow it.
 ## 3. Check for a changeset
 
 If the repo uses changesets and the diff ships code, confirm that a `.changeset/` file covers it.
-Write one if it is absent. Follow the `changeset` skill for the wording.
-
-The summary describes the whole branch, not the session. Read it against `git diff <base>...HEAD`.
-Write it again when it describes one commit, a step you took, or a fix to something this branch
-added. On an existing PR, write it again when the diff changes what the PR does. Do not add a
-clause for each new commit.
+Write one if it is absent. Follow the `changeset` skill for the wording. Check an existing summary
+against `git diff <base>...HEAD` too.
 
 ## 4. Write the title
 
@@ -124,8 +120,9 @@ reviewer match them up itself.
 - `src/api/session.ts`: token refresh now races the request that triggered it.
 ```
 
-**Describe the state the branch is in.** This rule owns every section of the body, the repo
-template's sections included. It does not own the `Changes` bullets alone. How the session reached
+**Describe the state the branch is in.** This rule owns the title, the changeset summary, and every
+section of the body, the repo template's sections included. It does not own the `Changes` bullets
+alone. How the session reached
 the current state is not the reviewer's concern. The reviewer reads the branch as it stands now. So
 the body holds:
 
@@ -179,7 +176,7 @@ Push the branch. Then check for an open PR on it with `gh pr view`.
 section says to keep. Read it also for what it tells you about the branch. Then write the body the
 diff asks for today. Do not edit the body line by line. Do not add a paragraph that answers the last
 round of review. A body that is patched each round grows, contradicts itself, and keeps claims the
-code has moved past.
+code has moved past. Write the title and the changeset summary again in the same way.
 
 Open the PR ready for review. Pass `--draft` only when the user asks for a draft, or when the work
 is unfinished.
