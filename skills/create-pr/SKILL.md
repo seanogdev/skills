@@ -59,9 +59,9 @@ by its word count. A short bullet that buries its point behind a caveat is uncle
 that states one plain fact is fine. The failure to watch for: a bullet that sets two separate facts
 side by side, so the reviewer has to hold both before either one lands. Shortening the sentence does
 not fix that. Deciding which fact the bullet is for, stating that one plainly, and cutting the other
-does. Cut the second fact to the file table, a code comment, or nowhere, rather than gluing it on
-with a semicolon or an `and`. Splitting into a second bullet is not the default fix either. Add one
-only when the second fact is itself something the reviewer would miss without it.
+does. Move the second fact to a code comment, or cut it, rather than gluing it on with a semicolon
+or an `and`. Splitting into a second bullet is not the default fix either. Add one only when the
+second fact is itself something the reviewer would miss without it.
 
 Write for a reviewer about to read the diff. Give each bullet the one thing the diff does not say,
 stated as its own plain claim, not wrapped in the reasoning that led there. Do not restate the diff.
@@ -69,38 +69,11 @@ Do not repeat the title. Do not explain code the reviewer can read.
 
 Read the finished list back as a list, not bullet by bullet. More than six or seven bullets on an
 ordinary PR, or a bullet you found yourself explaining rather than stating, is a sign you are
-narrating file by file instead of summarising. Merge what belongs together. Cut what the file table
-already says.
+narrating file by file instead of summarising. Merge what belongs together. Cut what the diff
+already shows.
 
 Call a workaround a workaround. State the real fix as its own plain claim, not as the last link in a
 chain of reasoning.
-
-**File table.** Write a collapsible table that covers every changed file. Add a very short note on
-how each file changed. Write a few words per cell, not a sentence.
-
-A GitHub table never wraps. It scrolls sideways, so a long path in the File column pushes the Change
-column out of view. Remove the prefix that every row shares. Name that prefix once in the summary
-line:
-
-```markdown
-<details>
-<summary>Files changed in <code>src/api/</code></summary>
-
-| File             | Change                      |
-| ---------------- | --------------------------- |
-| `client.ts`      | Added the retry wrapper     |
-| `client.test.ts` | Covers the new backoff path |
-
-</details>
-```
-
-If the rows share no prefix, remove what each row shares with its neighbours. Group the table by
-directory. If the paths are still wide enough to scroll, drop the table. Use a bullet list, which
-wraps at the page width:
-
-```markdown
-- `src/api/client.ts`: added the retry wrapper
-```
 
 **Focus areas.** Add this section only when part of the diff needs more care from the reviewer than
 the rest: a workaround, a judgment call, a change with no test behind it, a change to behaviour
@@ -149,12 +122,12 @@ A `Revision history` section is the same mistake inside a `<details>` block. Do 
 
 **Collapse the bulk.** Put anything the reviewer needs on hand but not on screen in a `<details>`
 block. Give the block a summary line that says what is inside. That covers review findings, a log
-excerpt, a benchmark run and a long list. The file table above is the pattern. Keep the open part of
-the body short enough to read without a scroll.
+excerpt, a benchmark run and a long list. Keep the open part of the body short enough to read
+without a scroll.
 
-Add no heading the repo's template does not ask for. `Changes`, the file table, `Focus areas` and
-`Screenshots` are the whole of it. Add no `Testing`, `Motivation`, `Risks` or `Notes` section unless
-the template has one.
+Add no heading the repo's template does not ask for. `Changes`, `Focus areas` and `Screenshots` are
+the whole of it. Add no `Testing`, `Motivation`, `Risks` or `Notes` section unless the template has
+one.
 
 Leave a `## Screenshots` heading. Leave it empty unless step 7 fills it. Never write placeholder
 text into it.
@@ -219,7 +192,7 @@ Keep everything the skill does not own:
 - Image and video markup wherever it sits: `![alt](url)`, `<img ...>`, `<video ...>`, and bare
   `https://github.com/user-attachments/...` links.
 - The whole `## Screenshots` section, verbatim.
-- Any heading the author added that is not `Changes`, the file table, or part of the repo template.
+- Any heading the author added that is not `Changes` or part of the repo template.
 - Every reference the diff cannot regenerate: the task or issue link a template section holds, a
   linked issue number, a `Follow-up to #NNNNN` line. A rebuilt body loses these unless you carry
   them across by hand. Read them out of the saved body before you write the new one.
