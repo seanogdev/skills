@@ -5,6 +5,9 @@ skill so it works on any machine:
 
 - No machine-specific paths, shell functions, or other assumptions about one particular setup. A
   skill that needs those belongs in a personal machine-config repo instead, not here.
+- Make each skill standalone where possible. Do not refer to another skill, in this repo or
+  elsewhere. You cannot know which skills a user has installed. Put what the skill needs into the
+  skill itself.
 - `license: MIT` in every `SKILL.md` frontmatter.
 - Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing. Run
   `scripts/optimize-skill-descriptions.sh` after changing a `description` field.
