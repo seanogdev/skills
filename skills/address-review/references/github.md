@@ -36,7 +36,7 @@ Read the whole thread, your own reply included. Treat the last comment as the li
 
 If they accept the answer or say thanks, do nothing more: the thread stays resolved, it needs no plan item, and a row in the summary is the whole of it.
 
-Otherwise reply, re-vote where the call moved, and resolve again. Reactions add, they do not replace. Clear the old vote with `scripts/unvote.ts` before you cast the new one. If the call moves to a decline on a human comment, `scripts/unvote.ts` is the whole action. No vote replaces the one you remove.
+Otherwise reply, re-vote where the call moved, and resolve again. Reactions add, they do not replace. Clear the old vote with `node scripts/unvote.ts` before you cast the new one. If the call moves to a decline on a human comment, `scripts/unvote.ts` is the whole action. No vote replaces the one you remove.
 
 ## Votes the user left
 
