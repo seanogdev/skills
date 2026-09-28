@@ -77,7 +77,7 @@ Short sha as the link text. Full sha in the href. Read the two back together wit
 
 A shared commit is still a sha to link. Where several items land in one commit, because they were too small or too related to split, link that same sha in every reply it covers. Do not drop the link because it is not 1:1 with the fix.
 
-**Declined.** Point at the code that answers the comment: "`useFoo` returns early when the ref is null on line 24, so the extra check is dead code." A reviewer can check a line reference. A reviewer cannot check an assertion. Stop there. Do not add a closing offer.
+**Declined.** Point at the code that answers the comment: "`useFoo` returns early when the ref is null on line 24, so the extra check is dead code." A reviewer can check a line reference. A reviewer cannot check an assertion. A comment that suggests a change, not one that claims a bug, gets the decision and its reason first: "We will not add an index now, because it saves little and adds a second generated file." The evidence after it compares costs of the same kind: time with time, memory with memory, file size with file size. Stop there. Do not add a closing offer.
 
 Never argue. If a thread turns into back and forth, say so and take it off the PR.
 
