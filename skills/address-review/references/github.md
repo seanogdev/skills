@@ -9,7 +9,7 @@ Each path below is relative to the skill directory, the one that holds `SKILL.md
 **Query first, every time.** Read the feedback from the API as the first action of the pass. A read from earlier in this conversation is stale. Do not reuse it. Reviewers add comments while a pass runs. A second invocation minutes after the first usually means something landed in between.
 
 ```bash
-./scripts/fetch.ts [PR]
+node scripts/fetch.ts [PR]
 ```
 
 Pass `$ARGUMENTS` as the `[PR]` argument only when it names a PR. A review file path must never reach this command.
@@ -58,7 +58,7 @@ Read the votes before you cast any of your own. `gh` runs as the user's account,
 Then build a plan and hand it to `apply.ts`, which lives in the skill's `scripts/` directory:
 
 ```bash
-./scripts/apply.ts PLAN.json
+node scripts/apply.ts PLAN.json
 ```
 
 It sends every reply at once. Then it sends every vote and resolve at once. Two rounds rather than one pass per item, so a vote never lands on a thread ahead of the reply that explains it. Every reply posts publicly the moment it is sent. If a reply fails, that item's vote and resolve are skipped. No thread ends up voted and closed with nothing said in it. Running the same plan twice is safe. A reply already on the thread in your name is reported as `duplicate` and is not sent again.
@@ -100,7 +100,7 @@ Never vote a human's comment down. The reply carries the decline, and it says wh
 
 Vote on the comment that raised the point, which is the first comment in the thread. Do not vote on your own reply. Cast one vote per comment. The vote must match what the reply says. A reply that declines and a thumbs up next to it read as a contradiction.
 
-Undo a vote with `./scripts/unvote.ts COMMENT_URL`. A vote on a review body cannot be undone at all, so be sure of that one before you cast it.
+Undo a vote with `node scripts/unvote.ts COMMENT_URL`. A vote on a review body cannot be undone at all, so be sure of that one before you cast it.
 
 A comment the user already voted on keeps their vote. It is on the same account as yours. Do not add to it, change it or remove it. Your reply carries your call on those.
 
