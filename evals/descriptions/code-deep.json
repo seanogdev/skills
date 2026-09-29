@@ -1,0 +1,23 @@
+[
+  { "query": "find optimizations in src/search, it feels sluggish on big repos", "should_trigger": true },
+  { "query": "why is the /orders endpoint so slow? p99 is over 2 seconds", "should_trigger": true },
+  {
+    "query": "our worker process keeps growing to 8GB, can you look at the cache module and cut memory",
+    "should_trigger": true
+  },
+  { "query": "the app takes 6 seconds to start, dig into what happens at boot", "should_trigger": true },
+  { "query": "throughput on the ingest job doesn't scale past 4 threads, figure out why", "should_trigger": true },
+  { "query": "make the editor feel snappier when typing in large files", "should_trigger": true },
+  { "query": "do a perf pass on the image pipeline and tell me where the time goes", "should_trigger": true },
+  { "query": "this report query takes forever, can you make it faster", "should_trigger": true },
+  { "query": "hunt for latency wins in the checkout flow", "should_trigger": true },
+  { "query": "clean up this module so it's easier to read, it's a mess", "should_trigger": false },
+  { "query": "review my PR before I merge it", "should_trigger": false },
+  { "query": "the login endpoint returns 500 sometimes, find the bug", "should_trigger": false },
+  { "query": "optimize my resume for software engineering roles", "should_trigger": false },
+  { "query": "help me write an SEO-optimized landing page", "should_trigger": false },
+  { "query": "how do I set up a CI job that runs benchmarks on every PR", "should_trigger": false },
+  { "query": "which AWS instance type is cheapest for our workload", "should_trigger": false },
+  { "query": "explain how this caching layer works", "should_trigger": false },
+  { "query": "add a loading spinner to the dashboard page", "should_trigger": false }
+]
