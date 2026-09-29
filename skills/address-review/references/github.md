@@ -92,7 +92,7 @@ The vote records only whether the comment should be addressed — not a judgment
 
 `THUMBS_UP` and `THUMBS_DOWN` are the only two reactions this skill uses. Never send `LAUGH`, `HOORAY`, `CONFUSED`, `HEART`, `ROCKET` or `EYES`, whatever the comment says.
 
-- **`THUMBS_UP`**: the comment should be addressed. Vote it up when you fixed it. Vote it up when you agree with it but the fix is out of scope for this PR. Any author.
+- **`THUMBS_UP`**: the comment should be addressed. Vote it up when you fixed it, all of it or part of it. Vote it up when you agree with it but the fix is out of scope for this PR. Any author.
 - **`THUMBS_DOWN`**: the comment should not be addressed. Cast it only on an automated comment, where it feeds the reviewer's own accuracy stats. Vote it down when you declined it: it misreads the code, the concern is already handled, or the change would be wrong.
 - **No vote**: every other case. That covers a declined human comment, a question you asked instead of making a call, and an outdated thread.
 

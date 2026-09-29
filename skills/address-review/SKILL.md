@@ -54,7 +54,7 @@ Make the fixes on the PR branch. If `git worktree list` shows a checkout of that
 
 This covers everything this skill writes: the thread replies, the round comment a local pass leaves, any follow-up issue it opens, and the summary at the end.
 
-**Keep every reply short.** One or two sentences. Three at the outside, and only when a decline needs a second line of evidence. Lead with the outcome. Cut any sentence that does not change what the reviewer does next.
+**Keep every reply short.** One or two sentences. Three at the outside, and only when a decline needs a second line of evidence. Cut any sentence that does not change what the reviewer does next.
 
 **Write it in simple technical English.** One idea per sentence. Active voice. Name who did what. Simple present or simple past. No `-ing` verb forms. No idiom, no slang, no metaphor. Write "removes" not "bails", "starts" not "kicks off". Use the same word for the same thing each time. Drop the words that add emphasis and no information: "just", "simply", "actually", "really", "basically".
 
@@ -67,6 +67,8 @@ This covers everything this skill writes: the thread replies, the round comment 
 - An offer to do more work, or a question about whether they are happy.
 - A restatement of the outcome in a second sentence.
 
+**Open with the outcome.** The first words of a reply tell the reviewer whether you took the comment, took part of it, or did not take it. Use your own words, not a fixed label. A question has no outcome to give.
+
 **Fixed.** Say what changed, in one sentence. "Moved the normalisation into the transformer." A commit sha beats a description of the change, and a sha the reviewer can click beats a bare one. Link every sha you name to its commit:
 
 ```
@@ -77,7 +79,9 @@ Short sha as the link text. Full sha in the href. Read the two back together wit
 
 A shared commit is still a sha to link. Where several items land in one commit, because they were too small or too related to split, link that same sha in every reply it covers. Do not drop the link because it is not 1:1 with the fix.
 
-**Declined.** Point at the code that answers the comment: "`useFoo` returns early when the ref is null on line 24, so the extra check is dead code." A reviewer can check a line reference. A reviewer cannot check an assertion. A comment that suggests a change, not one that claims a bug, gets the decision and its reason first: "We will not add an index now, because it saves little and adds a second generated file." The evidence after it compares costs of the same kind: time with time, memory with memory, file size with file size. Stop there. Do not add a closing offer.
+**Partially accepted.** Name the part that you took first, with its sha. Then name the part that you did not take, with the evidence that a decline needs. "Renamed the prop ([`b2c3d4e`](…)), but kept the default: the parent sets it on line 12."
+
+**Declined.** Point at the code that answers the comment: "No change: `useFoo` returns early when the ref is null on line 24, so the extra check is dead code." A reviewer can check a line reference. A reviewer cannot check an assertion. A comment that suggests a change, not one that claims a bug, gets the decision and its reason first: "We will not add an index now, because it saves little and adds a second generated file." The evidence after it compares costs of the same kind: time with time, memory with memory, file size with file size. Stop there. Do not add a closing offer.
 
 Never argue. If a thread turns into back and forth, say so and take it off the PR.
 
@@ -97,17 +101,18 @@ The summary goes to the user. It is the last thing the pass produces. Write it o
 
 Lead with a table, one row per piece of feedback, in query order:
 
-| Comment                       | Outcome      | Change                                                   |
-| ----------------------------- | ------------ | -------------------------------------------------------- |
-| [`useFoo.ts:24`](COMMENT_URL) | Fixed        | Moved the normalisation into the transformer (`a1b2c3d`) |
-| [`Bar.vue:88`](COMMENT_URL)   | Declined     | The null guard on line 24 already covers it              |
-| [`Baz.ts:12`](COMMENT_URL)    | Out of scope | Tracked in #418                                          |
+| Comment                       | Outcome            | Change                                                                      |
+| ----------------------------- | ------------------ | --------------------------------------------------------------------------- |
+| [`useFoo.ts:24`](COMMENT_URL) | Fixed              | Moved the normalisation into the transformer (`a1b2c3d`)                    |
+| [`Bar.vue:88`](COMMENT_URL)   | Declined           | The null guard on line 24 already covers it                                 |
+| [`Qux.ts:40`](COMMENT_URL)    | Partially accepted | Renamed the prop (`b2c3d4e`). The default stays, because the parent sets it |
+| [`Baz.ts:12`](COMMENT_URL)    | Out of scope       | Tracked in #418                                                             |
 
 How to fill it in:
 
 - Link every row to its `url`, so the user can read the feedback without hunting for it. A local item has no url: label it `path:line` and leave it unlinked.
-- Use one of seven outcomes and nothing else: Fixed, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged. Acknowledged is for a thread that came back only to accept the last answer, so it is PR-only.
-- Fixed means the problem is gone. A change that hides the symptom is Worked around, and that row names the real fix.
+- Use one of eight outcomes and nothing else: Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged. Acknowledged is for a thread that came back only to accept the last answer, so it is PR-only.
+- Fixed means the problem is gone. A change that hides the symptom is Worked around, and that row names the real fix. A comment that you took only in part is Partially accepted, and that row names both parts.
 - Name the commit sha for every fix.
 - Keep each Change cell to one line.
 - Write the Change cell in the same simple technical English as the replies. The same cuts apply.
