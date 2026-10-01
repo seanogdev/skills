@@ -48,7 +48,7 @@ If a comment is ambiguous, ask. Do not guess what the reviewer meant. Ask in the
 
 Fix the cause, not the symptom. Suppressing a warning, skipping a test, loosening an assertion or special-casing the reviewer's input is not a fix. If the real fix is out of scope, decline the comment.
 
-Make the fixes on the PR branch. If `git worktree list` shows a checkout of that branch, work in that checkout. Commit them in small logical commits. Push to the PR branch **before** you reply. The reply must point at code that is already on the PR. Read every identifier back from its source before it goes in a public reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
+Make the fixes on the PR branch. If `git worktree list` shows a checkout of that branch, work in that checkout. Make one commit per fixed issue, and keep each commit to the fix for that one issue. This holds for the smallest fix too. Push to the PR branch **before** you reply. The reply must point at code that is already on the PR. Read every identifier back from its source before it goes in a public reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
 
 ## Reply voice
 
@@ -77,7 +77,7 @@ Moved the normalisation into the transformer ([`a1b2c3d`](https://github.com/OWN
 
 Short sha as the link text. Full sha in the href. Read the two back together with `git log -1 --format='%h %H'`. Use the same format in a review body reply or a conversation reply.
 
-A shared commit is still a sha to link. Where several items land in one commit, because they were too small or too related to split, link that same sha in every reply it covers. Do not drop the link because it is not 1:1 with the fix.
+Each fix has its own commit, so each reply links its own sha. Where two comments raise the same issue, one commit fixes it, and both replies link that sha.
 
 **Partially accepted.** Name the part that you took first, with its sha. Then name the part that you did not take, with the evidence that a decline needs. "Renamed the prop ([`b2c3d4e`](…)), but kept the default: the parent sets it on line 12."
 
