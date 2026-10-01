@@ -9,8 +9,10 @@ skill so it works on any machine:
   elsewhere. You cannot know which skills a user has installed. Put what the skill needs into the
   skill itself.
 - `license: MIT` in every `SKILL.md` frontmatter.
-- Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing. Run
-  `scripts/optimize-skill-descriptions.sh` after changing a `description` field.
+- Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing.
+- Never run `scripts/optimize-skill-descriptions.sh` yourself, even after changing a `description`
+  field. It makes billed calls and rewrites descriptions, so only the user runs it. Tell them when a
+  description has changed and leave the run to them.
 - The repo root is also a Claude Code plugin root (`.claude-plugin/`). Adding a skill under
   `skills/` is enough; there is no separate list to update.
 - The `Skill` tool never reads this repo directly. It reads the installed copy under
