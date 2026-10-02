@@ -10,8 +10,8 @@ skill so it works on any machine:
   skill itself.
 - `license: MIT` in every `SKILL.md` frontmatter.
 - Keep `evals/descriptions/<name>.json` in sync with each skill's trigger phrasing.
-- Never run `scripts/optimize-skill-descriptions.sh` yourself, even after changing a `description`
-  field. It makes billed calls and rewrites descriptions, so only the user runs it. Tell them when a
+- Never run `scripts/optimize-skill-descriptions.sh` yourself, even after adding a skill or changing
+  a `description` field. It makes billed calls and rewrites descriptions, so only the user runs it. Tell them when a
   description has changed and leave the run to them.
 - The repo root is also a Claude Code plugin root (`.claude-plugin/`). Adding a skill under
   `skills/` is enough; there is no separate list to update.
