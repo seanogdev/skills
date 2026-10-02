@@ -1,7 +1,7 @@
 # Skills
 
 Sean O'Grady's personal Claude Code (and general agent-skills) skills:
-`address-review`, `code-deep`, `prune-merged-branches`, `to-markdown`.
+`address-review`, `code-deep`, `prune-merged-branches`, `resolve-conflicts`, `to-markdown`.
 
 Each one lives at `skills/<name>/SKILL.md`. This is the layout that Claude Code plugins,
 `gh skill`, and the Vercel `skills` CLI all read.
