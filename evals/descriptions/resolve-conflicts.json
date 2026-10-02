@@ -1,0 +1,18 @@
+[
+  { "query": "this PR has merge conflicts with main, can you sort them out", "should_trigger": true },
+  { "query": "resolve the conflicts on my branch and push", "should_trigger": true },
+  { "query": "rebase onto main, there's going to be conflicts", "should_trigger": true },
+  { "query": "my merge stopped halfway with conflicts in three files, fix it", "should_trigger": true },
+  { "query": "update this branch with the latest develop", "should_trigger": true },
+  { "query": "github says this branch can't be merged automatically, deal with it", "should_trigger": true },
+  { "query": "the cherry-pick conflicted, finish it off", "should_trigger": true },
+  { "query": "pull main into my feature branch and fix whatever breaks", "should_trigger": true },
+  { "query": "go through the review comments on PR 512 and fix them", "should_trigger": false },
+  { "query": "merge this pull request once CI is green", "should_trigger": false },
+  { "query": "review my branch before I open a PR", "should_trigger": false },
+  { "query": "delete my local branches that are already merged", "should_trigger": false },
+  { "query": "squash the last four commits into one", "should_trigger": false },
+  { "query": "write a description for this pull request", "should_trigger": false },
+  { "query": "why did git say 'Already up to date' when I merged", "should_trigger": false },
+  { "query": "set up a pre-commit hook that runs the linter", "should_trigger": false }
+]
