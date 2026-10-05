@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Read every piece of feedback on a PR: inline threads, review bodies, conversation.
+// Read every piece of feedback on a PR: inline threads, review bodies, conversation, and the CI checks on its head commit.
 // Usage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)
 
 import { die as dieBase, DieError, errText, gh, gql } from './lib.ts';
@@ -16,7 +16,7 @@ try {
   const arg = process.argv[2];
   if (arg === '-h' || arg === '--help') {
     console.log(
-      "Read every piece of feedback on a PR: inline threads, review bodies, conversation.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
+      "Read every piece of feedback on a PR: inline threads, review bodies, conversation, and the CI checks on its head commit.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
     );
     process.exit(0);
   }
@@ -50,6 +50,12 @@ query($owner:String!, $repo:String!, $number:Int!) {
       }
       reviews(first:50) { nodes { id url state author { login __typename } body ...r } }
       comments(first:100) { nodes { ...c } }
+      commits(last:1) { nodes { commit { oid statusCheckRollup { state contexts(first:100) { nodes {
+        __typename
+        ... on CheckRun { name status conclusion detailsUrl databaseId
+                          checkSuite { workflowRun { databaseId workflow { name } } } }
+        ... on StatusContext { context state targetUrl }
+      } } } } } }
     }
   }
 }
@@ -80,7 +86,21 @@ fragment c on Reactable {
                | {id, url, state, author: .author.login, isBot: (.author.__typename == "Bot"), body,
                   userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}],
      conversation: [.comments.nodes[] | {id, url, author: .author.login, isBot: (.author.__typename == "Bot"), body,
-                    userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}]})`;
+                    userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}],
+     # null when no check has reported on the head commit: no CI, not a failure.
+     ci: (.commits.nodes[0].commit as $head
+          | $head.statusCheckRollup
+          | if . == null then null else
+              [.contexts.nodes[]
+               | if .__typename == "CheckRun"
+                 then {name, state: (.conclusion // "PENDING"), url: .detailsUrl,
+                       workflow: .checkSuite.workflowRun.workflow.name,
+                       runId: .checkSuite.workflowRun.databaseId, jobId: .databaseId}
+                 else {name: .context, state, url: .targetUrl} end] as $checks
+              | {sha: $head.oid, state,
+                 failing: [$checks[] | select(.state | IN("SUCCESS", "SKIPPED", "NEUTRAL", "PENDING", "EXPECTED") | not)],
+                 pending: [$checks[] | select(.state | IN("PENDING", "EXPECTED"))]}
+            end)})`;
 
   const raw = await gql(query, ['-f', `owner=${owner}`, '-f', `repo=${repo}`, '-F', `number=${number}`], jq);
 
