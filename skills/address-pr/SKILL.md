@@ -1,11 +1,11 @@
 ---
 name: address-pr
-description: Take every comment in a code review to a conclusion, on a GitHub PR or on a local review. Use when a review has landed and the user says "address the review", "fix the review comments", "respond to the comments", "handle this review", "work through the feedback", "get the comments sorted", or points at existing review feedback, flagged issues, or PR comments to resolve. Not for opening a new PR, writing its initial description, or giving a first review.
+description: Take a GitHub PR to a conclusion, every review comment and every failing CI check, or work through a local review. Use when a review has landed or CI has gone red and the user says "address the PR", "address the review", "fix the review comments", "respond to the comments", "work through the feedback", "fix CI", "the checks are failing", "get this PR green", or points at existing review feedback, PR comments, or failing checks to resolve. Not for opening a new PR, writing its initial description, giving a first review, or merging.
 license: MIT
 argument-hint: '[PR number, url or branch, or a path to a review file]'
 ---
 
-Take every item of live feedback to a conclusion. Fix it, or push back on it. Then account for the whole pass to the user. On a PR, also reply either way, vote on the comment, and resolve the thread.
+Take a PR to a conclusion. Fix each item of live feedback, or push back on it. Fix each failing CI check, or trace it to a cause outside the branch. Then account for the whole pass to the user. On a PR, also reply to each comment either way, vote on it, and resolve the thread.
 
 ## Where the feedback is
 
@@ -28,6 +28,8 @@ Then read the file for that mode before you do anything else. Each path in this 
 - Local: `references/local.md`.
 
 The mode file holds the rules this file does not repeat.
+
+If the branch has an open PR, CI is part of the pass in either mode. Read `references/ci.md` too. A PR with no CI is not a failing PR.
 
 ## Deciding
 
@@ -89,7 +91,7 @@ Save the detail for the user-facing summary at the end. That is where length is 
 
 ## Finishing
 
-**Re-read the feedback before the summary.** Run `node scripts/fetch.ts` again. The pass took time, and a reviewer may have commented during it. On local feedback, read the file again for the same reason. Also check whether the user has said anything since the invocation that changes the ask. Anything the first read missed goes through the same decide, reply, vote and resolve loop. Then query once more. A thread you have just answered and resolved drops out of the next read. Write the summary only when a fresh query comes back with nothing left to act on.
+**Re-read the feedback before the summary.** Run `node scripts/fetch.ts` again. The pass took time, and a reviewer may have commented during it. On local feedback, read the file again for the same reason. Also check whether the user has said anything since the invocation that changes the ask. Anything the first read missed goes through the same decide, reply, vote and resolve loop. Then query once more. A thread you have just answered and resolved drops out of the next read. Each push starts CI again, so wait for the checks on the final head as `references/ci.md` says. Write the summary only when a fresh query comes back with nothing left to act on, and no check on the head fails or is still running.
 
 A thread can come back with nothing new to decide and still not be done. `fetch.ts` returns a thread whenever `isResolved` is false, whether or not a human has spoken since. If the last comment on it is your own reply and it is still unresolved, that is not a thread you already handled: the vote or the resolve from earlier in the pass did not land. Cast the vote and resolve the thread now. Do not read an unchanged thread as settled; read `isResolved` on it.
 
@@ -111,7 +113,7 @@ Lead with a table, one row per piece of feedback, in query order:
 How to fill it in:
 
 - Link every row to its `url`, so the user can read the feedback without hunting for it. A local item has no url: label it `path:line` and leave it unlinked.
-- Use one of eight outcomes and nothing else: Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged. Acknowledged is for a thread that came back only to accept the last answer, so it is PR-only.
+- Use one of ten outcomes and nothing else: Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged, Rerun, Pending. Acknowledged is for a thread that came back only to accept the last answer, so it is PR-only. Rerun is for a flaky check that passed when it ran again, and Pending is for a check that did not finish. Those two are CI-only.
 - Fixed means the problem is gone. A change that hides the symptom is Worked around, and that row names the real fix. A comment that you took only in part is Partially accepted, and that row names both parts.
 - Name the commit sha for every fix.
 - Keep each Change cell to one line.
@@ -119,6 +121,7 @@ How to fill it in:
 - Do not repeat the Outcome word in the Change cell. "Fixed" beside "Fixed the null guard" says it twice.
 - Do not repeat the file or the line from the Comment cell.
 - Give the review bodies and the conversation comments a row each. Mark the Comment cell on any row that is not inline: `review body` or `conversation`.
+- Give each failing check a row after the feedback. Its Comment cell is `CI: <check name>`, linked to the check's `url`.
 
 Then, under the table, add the parts a table cannot hold. Add only what the table cannot carry. Never restate a row:
 
@@ -127,6 +130,7 @@ Then, under the table, add the parts a table cannot hold. Add only what the tabl
 - Anything you resolved on thin reasoning.
 - Every point you worked around rather than fixed, and what the real fix is.
 - Any thread you left open, and any automated comment you left unvoted.
+- Any check that still fails on the head, and why.
 - Anything that needs the user's call.
 
 A resolved thread is easy for the reviewer to scroll past. The user should know where you closed a door on their behalf.

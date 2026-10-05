@@ -18,7 +18,7 @@ Feedback arrives in three places on a PR: inline review threads, review bodies, 
 
 Still live means unresolved, plus any thread you replied in that someone spoke on since. GitHub leaves a thread resolved when a new comment lands on it. Without this rule, a reviewer who answers the reply you closed a thread with never reaches the next pass. Those threads come back with `isResolved: true`.
 
-Skip anything `viewer` wrote. Skip the CI and coverage chatter a PR collects. Your own replies inside a thread are the exception. They are what the reviewer answers, so read them. Keep every `url`. The summary at the end links its rows by them.
+Skip anything `viewer` wrote. Skip the CI and coverage chatter that bots post as comments: the check state comes from `ci`, as `references/ci.md` says. Your own replies inside a thread are the exception. They are what the reviewer answers, so read them. Keep every `url`. The summary at the end links its rows by them.
 
 A review body and a conversation comment have no thread to reply into. That is why each one takes the `prId`, as **Applying, voting and replying** below sets out. A review body carries a vote, and the user's vote, the same way a comment does.
 
