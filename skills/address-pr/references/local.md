@@ -8,13 +8,13 @@ Read this file when the feedback is local: a review that sits in this conversati
 
 Split it into items, one per distinct point. A paragraph that raises three things is three items. Keep the `path:line` each one points at. The summary labels its rows by that when there are no urls.
 
-Nothing is filtered out here. Every item is live. There is no thread state and there are no reactions, so nothing in `references/github.md` applies to a local pass. What stands in for a vote is the user saying it out loud: "the second one matters", "ignore the lint one". Weigh that exactly as **Votes the user left** in `references/github.md` weighs a `THUMBS_UP` or a `THUMBS_DOWN`.
+Nothing is filtered out here. Every item is live. There is no thread state and there are no reactions, so nothing in `references/github.md` applies to a local pass. What stands in for a vote is the user saying it out loud: "the second one matters", "ignore the lint one". Pass that to the item's subagent as the user's vote.
 
 ## Applying and replying
 
-Make the fixes. Make one commit per fixed issue, the same way. Nothing here has a thread to reply into or a comment to vote on, so the plan in `references/github.md` has no per-item rows.
+Work the items as **Working the items** in `SKILL.md` says. Nothing here has a thread to reply into or a comment to vote on, so the plan in `references/github.md` has no per-item rows.
 
-If the branch has an open PR, push. Then leave one comment on the PR that says what changed this round and why. The review happened off the PR. Without that comment, the branch grows commits that nothing on the PR accounts for. Keep it to a line per point. Each line opens with its outcome and names its sha. Write it in the **Reply voice** of `SKILL.md`.
+If the branch has an open PR, push. Then leave one comment on the PR that says what changed this round and why. The review happened off the PR. Without that comment, the branch grows commits that nothing on the PR accounts for. Keep it to a line per point. Each line opens with its outcome and names its sha. Build it from the subagents' replies.
 
 It goes through `apply.ts` as a single item that carries a `prId` and a `bodyFile` and nothing else. That posts it as a conversation comment. An identical body already posted in your name comes back as `duplicate`.
 

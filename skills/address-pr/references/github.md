@@ -28,13 +28,11 @@ A reviewer often raises the main point in a review body or conversation comment,
 
 ## Threads that have come back
 
-A thread with `isOutdated: true` usually means the code moved on. Check if the concern still applies before you spend effort on it.
+A thread with `isOutdated: true` usually means the code moved on. Pass that to its subagent.
 
-`isResolved: true` on a thread means you settled it on an earlier pass and someone replied since. The earlier call is not binding. The reviewer read it and answered it. That is the case for deciding again, not for standing behind the first answer.
+`isResolved: true` on a thread means you settled it on an earlier pass and someone replied since. Tell its subagent it came back: the earlier call is not binding.
 
-Read the whole thread, your own reply included. Treat the last comment as the live one. Then decide it as you decide any other comment. A reviewer who answers a decline with a path you did not trace has earned a second look. A reviewer who repeats the original point with nothing new behind it has not. Say so once more, and that is the whole reply.
-
-If they accept the answer or say thanks, do nothing more: the thread stays resolved, it needs no plan item, and a row in the summary is the whole of it.
+If the reviewer only accepts the answer or says thanks, it is not an item: the thread stays resolved, and a row in the summary is the whole of it.
 
 Otherwise reply, re-vote where the call moved, and resolve again. Reactions add, they do not replace. Clear the old vote with `node scripts/unvote.ts` before you cast the new one. If the call moves to a decline on a human comment, `scripts/unvote.ts` is the whole action. No vote replaces the one you remove.
 
@@ -44,14 +42,10 @@ The user votes on review comments too, with the same two reactions. A vote from 
 
 Read the votes before you cast any of your own. `gh` runs as the user's account, so once this skill reacts, its reaction is indistinguishable from theirs. Your own reply in the thread is what tells them apart. No reply from you means the vote is theirs. If you replied, the vote is yours from that pass, and the reply says which way it went. If the two disagree, the user changed it, and that disagreement is the signal.
 
-**`THUMBS_UP` from the user.** They value the comment. Treat it with more reverence than the rest. Reverence is a higher bar for declining, not agreement by default. Check the claim as carefully as ever. Then:
+Pass the user's vote to the item's subagent; `references/item.md` says how it weighs. Two cases change what you do with its return:
 
-- Read the whole file and trace the failure path before you decline it. The decline needs a line reference, not an assertion.
-- Take the fix where the call is close.
-- An out of scope answer needs a follow-up issue or task. The reply names it.
-- If you declined it anyway, tell the user in the summary. They may want to reverse that.
-
-**`THUMBS_DOWN` from the user.** They do not want the comment addressed. Take that as the decision and decline it. One exception: if the check turns up a real defect, do not close the thread on it. Leave that thread open. Put the evidence in the summary, so the user can change their mind.
+- **`THUMBS_UP` declined anyway.** Tell the user in the summary. They may want to reverse that.
+- **`THUMBS_DOWN` with a real defect behind it.** The subagent's notes say so. Leave that thread open, and put the evidence in the summary, so the user can change their mind.
 
 ## Applying, voting and replying
 
@@ -63,7 +57,7 @@ node scripts/apply.ts PLAN.json
 
 It sends every reply at once. Then it sends every vote and resolve at once. Two rounds rather than one pass per item, so a vote never lands on a thread ahead of the reply that explains it. Every reply posts publicly the moment it is sent. If a reply fails, that item's vote and resolve are skipped. No thread ends up voted and closed with nothing said in it. Running the same plan twice is safe. A reply already on the thread in your name is reported as `duplicate` and is not sent again.
 
-Resolve every thread you replied to, the pushed-back ones included. A thread that has come back gets `"resolve": true` again. Only one thread stays open, the case named in **Votes the user left**: the user voted a comment down and the claim holds up anyway. You cannot resolve a conversation comment, so the reply and the vote close it.
+Resolve every thread you replied to, the pushed-back ones included. A thread that has come back gets `"resolve": true` again. Only one thread stays open, the `THUMBS_DOWN` case named in **Votes the user left**. You cannot resolve a conversation comment, so the reply and the vote close it.
 
 One object per piece of feedback, `ref` naming the row the summary table will use:
 

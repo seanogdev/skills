@@ -1,6 +1,6 @@
 # CI
 
-Read this file when the branch has an open PR, in either mode. The rules that decide and fix an issue live in `SKILL.md`. They apply to a failing check the same way they apply to a comment.
+Read this file when the branch has an open PR, in either mode.
 
 Each path below is relative to the skill directory, the one that holds `SKILL.md`. Expand it to a full path before you run a command.
 
@@ -14,23 +14,9 @@ Each path below is relative to the skill directory, the one that holds `SKILL.md
 
 Only the checks on the head commit count. A failure on an older commit is history.
 
-## Deciding a failure
+## Working a failure
 
-Read the log before you decide. For a check with a `jobId`, this prints the steps that failed:
-
-```bash
-gh run view --job JOB_ID --log-failed
-```
-
-A check with no `jobId` runs on a service outside GitHub Actions. Read what its `url` shows. If you cannot get to the log, give the check an Asked row and tell the user where it is.
-
-Find the first error in the log, not the last line. A later step often fails only because an earlier step failed. Then trace the error to its cause, and put the check in one of these three cases:
-
-- **The branch causes it.** Fix the cause, as **Applying the fixes** in `SKILL.md` says. Run the failing command locally before you push, when you can. The log names the command. If the branch changed a behaviour on purpose and a test still asserts the old behaviour, the fix is the test. If the test catches a regression, the fix is the code. The check must pass because the code is correct. Never make it pass by a change to the check: a skipped or deleted test, a lower threshold, `continue-on-error`, or an edit to the workflow file.
-- **The base branch fails the same way.** The failure is older than the branch. Compare with `gh run list --branch BASE --workflow WORKFLOW --limit 5`. It is Out of scope. Do not fix it on this PR unless the user asks.
-- **The code does not cause it.** The error names the infrastructure, not the code: a runner that stopped, a network timeout, a registry outage, a test that fails at random. A cancelled check with no error in its log is in this case too. Run the failed jobs again one time with `gh run rerun RUN_ID --failed`. If the job fails again with the same error, it is not a flake. Decide it again under the first two cases.
-
-Two checks that fail for one cause get one commit, and both rows name that sha. A CI fix gets no reply on the PR. The commit is the record.
+Each failing check is an item, worked by a subagent as **Working the items** in `SKILL.md` says. Pass the check's `name`, `url`, `workflow`, `runId` and `jobId`, and say whether it was already rerun this pass. Two checks that fail for one cause are one item: one commit, and both rows name that sha.
 
 ## Waiting for the head
 
@@ -44,6 +30,6 @@ Run it in the background where the harness allows, and let its exit wake you. Do
 
 Run this only when the first read of `ci` was not null. On a PR with no checks, `gh pr checks` exits non-zero with "no checks reported". That exit code tells you nothing about a failure.
 
-When the watch exits, read `ci` from `fetch.ts` again, one time. That read decides the result, not the exit code of `gh pr checks`. Directly after a push, `ci` can be null for some seconds before the checks register. Read again before you decide that CI went away. A new failure goes through **Deciding a failure** again.
+When the watch exits, read `ci` from `fetch.ts` again, one time. That read decides the result, not the exit code of `gh pr checks`. Directly after a push, `ci` can be null for some seconds before the checks register. Read again before you decide that CI went away. A new failure becomes a new item.
 
 A check that has not finished when you stop to wait gets a Pending row.

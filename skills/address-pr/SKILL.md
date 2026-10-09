@@ -11,7 +11,7 @@ Take a PR to a conclusion. Fix each item of live feedback, or push back on it. F
 
 **A PR.** The default. If no PR was named, use the open PR for the current branch.
 
-**Local.** A review that sits in this conversation: a `/code-review` report, a pasted set of comments, or the user listing what they want changed. A file the user points at is local too. Deciding and fixing are the same.
+**Local.** A review that sits in this conversation: a `/code-review` report, a pasted set of comments, or the user listing what they want changed. A file the user points at is local too. The items are worked the same way.
 
 `$ARGUMENTS` holds what the user typed after the skill name. It is empty when they gave nothing.
 
@@ -31,67 +31,39 @@ The mode file holds the rules this file does not repeat.
 
 If the branch has an open PR, CI is part of the pass in either mode. Read `references/ci.md` too. A PR with no CI is not a failing PR.
 
-## Deciding
+## Working the items
 
-Check the claim before you act on it. Read the surrounding file, not only the diff hunk. If a comment describes a bug, trace the path that produces it. A reviewer who works from a hunk in isolation sometimes flags something the wider file already handles. Apply the same standard whoever wrote the comment.
+Split the feedback into items, one per distinct point. Each failing check is an item too. Where two items raise the same issue, make them one item, so one commit fixes both. A thread that came back only to accept the last answer or say thanks is not an item: it gets an Acknowledged row in the summary and nothing else.
 
-The comment was written against some commit, and the branch has probably moved since. Check the file as it stands now, not the snippet quoted in the comment and not the diff hunk it was raised against. A later commit can fix what the comment describes, move the line it points at, or change the code around it. If the line number or the quoted code no longer matches the file, that gap is itself a sign the code moved on. The current version decides the call.
+Hand each item to a subagent, one at a time, since they all commit to the same branch. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass.
 
-Fix it if the claim holds up. Fix it also if the reviewer points at a real risk, even where you would pick a different fix. Say so if it does not hold up. Decline it in these cases:
-
-- The comment misreads the code.
-- The change breaks something that the diff does not show.
-- The problem it describes cannot be reproduced.
-- It asks for an abstraction the codebase has not earned yet.
-
-If a comment is ambiguous, ask. Do not guess what the reviewer meant. Ask in the reply on a PR. Ask the user directly if the feedback is local.
-
-## Applying the fixes
-
-Fix the cause, not the symptom. Suppressing a warning, skipping a test, loosening an assertion or special-casing the reviewer's input is not a fix. If the real fix is out of scope, decline the comment.
-
-Make the fixes on the PR branch. If `git worktree list` shows a checkout of that branch, work in that checkout. Make one commit per fixed issue, and keep each commit to the fix for that one issue. This holds for the smallest fix too. Push to the PR branch **before** you reply. The reply must point at code that is already on the PR. Read every identifier back from its source before it goes in a public reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
-
-## Reply voice
-
-This covers everything this skill writes: the thread replies, the round comment a local pass leaves, any follow-up issue it opens, and the summary at the end.
-
-**Keep every reply short.** One or two sentences. Three at the outside, and only when a decline needs a second line of evidence. Cut any sentence that does not change what the reviewer does next.
-
-**Write it in simple technical English.** One idea per sentence. Active voice. Name who did what. Simple present or simple past. No `-ing` verb forms. No idiom, no slang, no metaphor. Write "removes" not "bails", "starts" not "kicks off". Use the same word for the same thing each time. Drop the words that add emphasis and no information: "just", "simply", "actually", "really", "basically".
-
-**Cut what the reviewer can already see.** They have their own comment, the file and the line the thread sits on, the diff, and the sha you linked. So none of this goes in a reply:
-
-- Their point, said back to them.
-- The file or line the thread is anchored to, named on its own. A line reference that carries evidence stays.
-- "I agree", "good catch", "as you suggested", "you're right".
-- A description of a change the linked sha already shows.
-- An offer to do more work, or a question about whether they are happy.
-- A restatement of the outcome in a second sentence.
-
-**Open with the outcome.** The first words of a reply tell the reviewer whether you took the comment, took part of it, or did not take it. Use your own words, not a fixed label. A question has no outcome to give.
-
-**Fixed.** Say what changed, in one sentence. "Moved the normalisation into the transformer." A commit sha beats a description of the change, and a sha the reviewer can click beats a bare one. Link every sha you name to its commit:
+Pick the checkout first. If `git worktree list` shows a checkout of the PR branch, use that one. Then send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
 
 ```
-Moved the normalisation into the transformer ([`a1b2c3d`](https://github.com/OWNER/REPO/commit/a1b2c3d4e5f6789012345678901234567890abcd)).
+Work one item of PR feedback. Read SKILL_DIR/references/item.md first and follow it.
+
+Checkout: <full path>
+Reply file: <full path, one per item>
+Item:
+<a comment: url, author, isBot, path:line, isOutdated, whether it came back
+ from an earlier pass, the user's vote, and every comment in the thread>
+<a check: name, url, workflow, runId, jobId, head sha, base branch, and
+ whether it was already rerun>
+<anything the user said about this item>
 ```
 
-Short sha as the link text. Full sha in the href. Read the two back together with `git log -1 --format='%h %H'`. Use the same format in a review body reply or a conversation reply.
+Each subagent returns an outcome, a commit, evidence, a one-line change, and notes. Weigh each return before you act on it:
 
-Each fix has its own commit, so each reply links its own sha. Where two comments raise the same issue, one commit fixes it, and both replies link that sha.
+- Read the evidence line yourself before you accept a decline of a comment the user voted up.
+- If a return does not hold up, send the same subagent back with what is wrong, rather than a fresh one.
+- An Asked outcome on local feedback is a question for the user. Ask it.
+- Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
 
-**Partially accepted.** Name the part that you took first, with its sha. Then name the part that you did not take, with the evidence that a decline needs. "Renamed the prop ([`b2c3d4e`](…)), but kept the default: the parent sets it on line 12."
-
-**Declined.** Point at the code that answers the comment: "No change: `useFoo` returns early when the ref is null on line 24, so the extra check is dead code." A reviewer can check a line reference. A reviewer cannot check an assertion. A comment that suggests a change, not one that claims a bug, gets the decision and its reason first: "We will not add an index now, because it saves little and adds a second generated file." The evidence after it compares costs of the same kind: time with time, memory with memory, file size with file size. Stop there. Do not add a closing offer.
-
-Never argue. If a thread turns into back and forth, say so and take it off the PR.
-
-Save the detail for the user-facing summary at the end. That is where length is allowed, not the PR.
+Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass with no PR pushes nothing.
 
 ## Finishing
 
-**Re-read the feedback before the summary.** Run `node scripts/fetch.ts` again. The pass took time, and a reviewer may have commented during it. On local feedback, read the file again for the same reason. Also check whether the user has said anything since the invocation that changes the ask. Anything the first read missed goes through the same decide, reply, vote and resolve loop. Then query once more. A thread you have just answered and resolved drops out of the next read. Each push starts CI again, so wait for the checks on the final head as `references/ci.md` says. Write the summary only when a fresh query comes back with nothing left to act on, and no check on the head fails or is still running.
+**Re-read the feedback before the summary.** Run `node scripts/fetch.ts` again. The pass took time, and a reviewer may have commented during it. On local feedback, read the file again for the same reason. Also check whether the user has said anything since the invocation that changes the ask. Anything the first read missed goes through the same items, reply, vote and resolve loop. Then query once more. A thread you have just answered and resolved drops out of the next read. Each push starts CI again, so wait for the checks on the final head as `references/ci.md` says. Write the summary only when a fresh query comes back with nothing left to act on, and no check on the head fails or is still running.
 
 A thread can come back with nothing new to decide and still not be done. `fetch.ts` returns a thread whenever `isResolved` is false, whether or not a human has spoken since. If the last comment on it is your own reply and it is still unresolved, that is not a thread you already handled: the vote or the resolve from earlier in the pass did not land. Cast the vote and resolve the thread now. Do not read an unchanged thread as settled; read `isResolved` on it.
 
@@ -117,7 +89,7 @@ How to fill it in:
 - Fixed means the problem is gone. A change that hides the symptom is Worked around, and that row names the real fix. A comment that you took only in part is Partially accepted, and that row names both parts.
 - Name the commit sha for every fix.
 - Keep each Change cell to one line.
-- Write the Change cell in the same simple technical English as the replies. The same cuts apply.
+- Take the Change cell from the subagent's one-line change.
 - Do not repeat the Outcome word in the Change cell. "Fixed" beside "Fixed the null guard" says it twice.
 - Do not repeat the file or the line from the Comment cell.
 - Give the review bodies and the conversation comments a row each. Mark the Comment cell on any row that is not inline: `review body` or `conversation`.
