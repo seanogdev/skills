@@ -4,19 +4,19 @@ Read this file when the feedback is local: a review that sits in this conversati
 
 ## Reading the feedback
 
-**Read it at the start of the pass, every time.** Read a file again even if you read it minutes ago. The reason is the reason the PR gets queried again: the user edits these files, and the copy from earlier in this conversation is stale. If the feedback is in the conversation instead, the latest version of it wins. The user narrowing it or adding to it after the fact is part of the feedback, not a footnote to it.
+**Read it at the start of the pass, every time.** The user edits these files, so a copy from earlier in this conversation is stale. If the feedback is in the conversation, the latest version wins, and the user narrowing it or adding to it later is part of it.
 
-Split it into items, one per distinct point. A paragraph that raises three things is three items. Keep the `path:line` each one points at. The summary labels its rows by that when there are no urls.
+A paragraph that raises three things is three items. Keep the `path:line` each one points at for the summary.
 
-Nothing is filtered out here. Every item is live. There is no thread state and there are no reactions, so nothing in `references/github.md` applies to a local pass. What stands in for a vote is the user saying it out loud: "the second one matters", "ignore the lint one". Pass that to the item's subagent as the user's vote.
+Every item is live. Nothing in `references/github.md` applies. What stands in for a vote is the user saying it out loud: "the second one matters", "ignore the lint one". Pass that to the item's subagent as the user's vote.
 
 ## Applying and replying
 
-Work the items as **Working the items** in `SKILL.md` says. Nothing here has a thread to reply into or a comment to vote on, so the plan in `references/github.md` has no per-item rows.
+Work the items as **Working the items** in `SKILL.md` says.
 
-If the branch has an open PR, push. Then leave one comment on the PR that says what changed this round and why. The review happened off the PR. Without that comment, the branch grows commits that nothing on the PR accounts for. Keep it to a line per point. Each line opens with its outcome and names its sha. Build it from the subagents' replies.
+If the branch has an open PR, push. Then leave one comment on the PR that says what changed this round and why, so the new commits are accounted for on the PR. Keep it to a line per point. Each line opens with its outcome and names its sha. Build it from the subagents' replies.
 
-It goes through `apply.ts` as a single item that carries a `prId` and a `bodyFile` and nothing else. That posts it as a conversation comment. An identical body already posted in your name comes back as `duplicate`.
+Post it through `apply.ts` as a single item with only a `prId` and a `bodyFile`:
 
 ```json
 [{ "ref": "round summary", "prId": "PR_kwDO...", "bodyFile": "/tmp/round.md" }]
@@ -24,6 +24,6 @@ It goes through `apply.ts` as a single item that carries a `prId` and a `bodyFil
 
 `gh pr view --json id --jq .id` is where that `prId` comes from when no `fetch.ts` ran this pass.
 
-That comment is the only place the round goes. Never move it, or any part of it, into the PR description. The description follows the rule in **Finishing** in `SKILL.md`, the same as on any other pass.
+That comment is the only place the round goes. The PR description follows **Finishing** in `SKILL.md`, as on any pass.
 
 If the branch has no PR, push nothing unless the user asks. The summary is the whole of the output. Leave the feedback file itself as it is either way.

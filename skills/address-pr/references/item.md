@@ -103,5 +103,5 @@ A short report and nothing else:
 - **Outcome**: one of Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Rerun. Fixed means the problem is gone. A change that hides the symptom is Worked around.
 - **Commit**: `git log -1 --format='%h %H'` for the commit, if you made one.
 - **Evidence**: the `path:line` that backs a decline.
-- **Change**: one line for the summary table, in the same voice as the reply.
+- **Change**: one line for the summary table, in the voice of the reply. Leave out the outcome word and the file and line: those have their own cells.
 - **Notes**: only what the outcome cannot carry. A workaround's real fix. A call made on thin reasoning. A real defect behind a comment the user voted down. A question for the user.

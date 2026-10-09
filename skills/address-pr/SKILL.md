@@ -65,17 +65,13 @@ Push to the PR branch once, after the last item and **before** any reply goes ou
 
 ## Finishing
 
-**Re-read the feedback before the summary.** Run `node scripts/fetch.ts` again. The pass took time, and a reviewer may have commented during it. On local feedback, read the file again for the same reason. Also check whether the user has said anything since the invocation that changes the ask. Anything the first read missed goes through the same items, reply, vote and resolve loop. Then query once more. A thread you have just answered and resolved drops out of the next read. Each push starts CI again, so wait for the checks on the final head as `references/ci.md` says. Write the summary only when a fresh query comes back with nothing left to act on, and no check on the head fails or is still running.
+**Re-read the feedback.** Run `node scripts/fetch.ts` again, or read the local file again: a reviewer may have commented during the pass, and the user may have changed the ask since. Anything new becomes an item. A thread that comes back unresolved with your own reply last is one where the vote or the resolve did not land: cast and resolve it now. Then wait for CI on the final head as `references/ci.md` says. Move on once a fresh read has nothing left to act on and no check on the head fails or is still running.
 
-A thread can come back with nothing new to decide and still not be done. `fetch.ts` returns a thread whenever `isResolved` is false, whether or not a human has spoken since. If the last comment on it is your own reply and it is still unresolved, that is not a thread you already handled: the vote or the resolve from earlier in the pass did not land. Cast the vote and resolve the thread now. Do not read an unchanged thread as settled; read `isResolved` on it.
+**Bring the PR description up to date**, once, wherever the branch has an open PR. If the fixes changed what the branch does or made a claim in the body false, write the body again for the branch as it stands, and post it with `gh pr edit --body-file`. That replaces the whole body, so keep every image, video and `user-attachments` link the author added, with its heading and caption, and every issue or PR reference the diff cannot regenerate. Remove a claim that no longer holds, and put no revision history or note in its place. If the fixes changed nothing the body states, leave it.
 
-**Bring the PR description up to date.** Read the PR body once the re-read above comes back with nothing left to act on. This covers a local pass too, wherever the branch has an open PR. With no PR there is nothing to do here. The fixes this pass made can change what the branch does, or make a claim in the body false. If either happened, write the body again from scratch for the branch as it stands, and post it with `gh pr edit --body-file`. That replaces the whole body, so keep every image, video and `user-attachments` link the author added, with its heading and caption, and every issue or PR reference the diff cannot regenerate. If the fixes changed nothing the body states, leave the body as it is. Do this once, here, not once per comment.
+## Summary
 
-Do not add a revision history, in a `<details>` block or anywhere else. Do not leave a note beside a claim that says the claim no longer holds: remove the claim. The reviewer needs the branch as it stands, not the path it took to get there.
-
-The summary goes to the user. It is the last thing the pass produces. Write it once the fixes are pushed and every thread is settled, so the shas and the outcomes in it are real.
-
-Lead with a table, one row per piece of feedback, in query order:
+The summary goes to the user, last, once every fix is pushed and every thread is settled. Lead with a table, one row per item, in query order:
 
 | Comment                       | Outcome            | Change                                                                      |
 | ----------------------------- | ------------------ | --------------------------------------------------------------------------- |
@@ -84,27 +80,16 @@ Lead with a table, one row per piece of feedback, in query order:
 | [`Qux.ts:40`](COMMENT_URL)    | Partially accepted | Renamed the prop (`b2c3d4e`). The default stays, because the parent sets it |
 | [`Baz.ts:12`](COMMENT_URL)    | Out of scope       | Tracked in #418                                                             |
 
-How to fill it in:
+- **Comment**: linked to the item's `url`. A local item has no url, so label it `path:line`. Mark a row that is not inline `review body` or `conversation`. Failing checks come after the feedback, as `CI: <check name>` linked to the check's `url`.
+- **Outcome**: one of Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged, Rerun (a flaky check that passed when it ran again), Pending (a check that did not finish).
+- **Change**: the subagent's one-line change, with the sha of every fix.
 
-- Link every row to its `url`, so the user can read the feedback without hunting for it. A local item has no url: label it `path:line` and leave it unlinked.
-- Use one of ten outcomes and nothing else: Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged, Rerun, Pending. Acknowledged is for a thread that came back only to accept the last answer, so it is PR-only. Rerun is for a flaky check that passed when it ran again, and Pending is for a check that did not finish. Those two are CI-only.
-- Fixed means the problem is gone. A change that hides the symptom is Worked around, and that row names the real fix. A comment that you took only in part is Partially accepted, and that row names both parts.
-- Name the commit sha for every fix.
-- Keep each Change cell to one line.
-- Take the Change cell from the subagent's one-line change.
-- Do not repeat the Outcome word in the Change cell. "Fixed" beside "Fixed the null guard" says it twice.
-- Do not repeat the file or the line from the Comment cell.
-- Give the review bodies and the conversation comments a row each. Mark the Comment cell on any row that is not inline: `review body` or `conversation`.
-- Give each failing check a row after the feedback. Its Comment cell is `CI: <check name>`, linked to the check's `url`.
+Under the table, add only what a row cannot carry:
 
-Then, under the table, add the parts a table cannot hold. Add only what the table cannot carry. Never restate a row:
-
-- Every comment the user voted up, or said out loud that they wanted, that you declined anyway, with the reason. This one goes first.
-- Every thread that came back from an earlier pass, and whether the reviewer's answer moved your call.
-- Anything you resolved on thin reasoning.
-- Every point you worked around rather than fixed, and what the real fix is.
-- Any thread you left open, and any automated comment you left unvoted.
+- Every comment the user voted up, or said they wanted, that was declined anyway, with the reason. This one goes first.
+- Every thread that came back from an earlier pass, and whether the reviewer's answer moved the call.
+- Anything resolved on thin reasoning. A resolved thread is easy for the reviewer to scroll past.
+- Every point worked around rather than fixed, and what the real fix is.
+- Any thread left open, and any automated comment left unvoted.
 - Any check that still fails on the head, and why.
 - Anything that needs the user's call.
-
-A resolved thread is easy for the reviewer to scroll past. The user should know where you closed a door on their behalf.
