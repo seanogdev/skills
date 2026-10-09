@@ -35,7 +35,7 @@ If the branch has an open PR, CI is part of the pass in either mode. Read `refer
 
 Split the feedback into items, one per distinct point. Each failing check is an item too. Where two items raise the same issue, make them one item, so one commit fixes both. A thread that came back only to accept the last answer or say thanks is not an item: it gets an Acknowledged row in the summary and nothing else.
 
-Hand each item to a subagent, one at a time, since they all commit to the same branch. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass. Run it on a smaller model than yours where the harness lets you choose: `sonnet` in Claude Code. You keep the judgment on its return.
+Hand each item to a subagent, one at a time, since they all commit to the same branch. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass. Run it one tier below your own model. In Claude Code, that is `model: "sonnet"` on the Agent call. In another harness, pick its mid-tier model, or leave the default where the harness offers no choice. You keep the judgment on its return.
 
 Pick the checkout first. If `git worktree list` shows a checkout of the PR branch, use that one. Then send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
 
