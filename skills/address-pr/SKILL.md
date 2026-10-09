@@ -59,6 +59,8 @@ Each subagent returns an outcome, a commit, evidence, a one-line change, and not
 - An Asked outcome on local feedback is a question for the user. Ask it.
 - Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
 
+Batch your own calls the same way: independent reads in one call, and the push with the `git log` that reads the shas back.
+
 Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass with no PR pushes nothing.
 
 ## Finishing

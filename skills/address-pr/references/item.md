@@ -4,6 +4,8 @@ You work one item of feedback on a PR branch: a review comment, a failing CI che
 
 Push nothing and post nothing. Whoever sent you pushes, replies, votes and resolves.
 
+Every tool call is a turn, and every turn re-reads the whole context. Batch: put every read you already know you need into one call (several `sed -n` ranges, `grep`s and `git diff`s in one command), and filter test and lint output down to the failures.
+
 ## Deciding a comment
 
 Check the claim before you act on it. Read the surrounding file, not only the diff hunk. If a comment describes a bug, trace the path that produces it. A reviewer who works from a hunk in isolation sometimes flags something the wider file already handles. Apply the same standard whoever wrote the comment.
@@ -59,7 +61,7 @@ A CI fix gets no reply on the PR. The commit is the record.
 
 Fix the cause, not the symptom. Suppressing a warning, skipping a test, loosening an assertion or special-casing the reviewer's input is not a fix. If the real fix is out of scope, decline the comment.
 
-Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. This holds for the smallest fix too. Read every identifier back from its source before it goes in a reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
+Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. This holds for the smallest fix too. Commit and read the sha back in the same command: `git commit -m MSG && git log -1 --format='%h %H'`. Read every identifier back from its source before it goes in a reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
 
 ## The reply
 
