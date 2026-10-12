@@ -49,6 +49,8 @@ node scripts/apply.ts PLAN.json
 
 It sends every reply, then every vote and resolve, so a vote never lands ahead of the reply that explains it. If a reply fails, that item's vote and resolve are skipped. Running the same plan twice is safe: a reply already posted in your name comes back as `duplicate`.
 
+Be mindful of the reviewer: they may be in the middle of a review, and each new comment pings them. Where the last comment in a thread, or on the PR conversation, is already yours and nobody has answered it, `apply.ts` appends the new reply to that comment instead of posting another. An edit sends no notification, so write such a reply to read as a continuation. Send everything in one plan and one run, never a trickle.
+
 Resolve every thread you replied to, the declined ones included. Only the `THUMBS_DOWN` case in **Votes the user left** stays open. A conversation comment cannot be resolved; the reply and the vote close it.
 
 One object per piece of feedback, `ref` naming the row the summary table will use:

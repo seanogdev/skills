@@ -38,6 +38,9 @@ const Q = {
   comment: `mutation($subjectId:ID!, $body:String!) {
     addComment(input: {subjectId: $subjectId, body: $body}) { commentEdge { node { url } } }
   }`,
+  editComment: `mutation($id:ID!, $body:String!) {
+    updateIssueComment(input: {id: $id, body: $body}) { issueComment { url } }
+  }`,
   resolve: `mutation($threadId:ID!) {
     resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
   }`,
@@ -49,7 +52,7 @@ const Q = {
 const Q_EXISTING = {
   pr: `query($id:ID!) {
     node(id:$id) { ... on PullRequest {
-      comments(last:50) { nodes { author { login } body url } } } }
+      comments(last:50) { nodes { id author { login } body url } } } }
   }`,
   thread: `query($id:ID!) {
     node(id:$id) { ... on PullRequestReviewThread {
@@ -59,6 +62,7 @@ const Q_EXISTING = {
 };
 
 interface Comment {
+  id?: string;
   databaseId?: number;
   author: { login: string } | null;
   body: string;
@@ -66,7 +70,18 @@ interface Comment {
 }
 
 function duplicateOf(nodes: Comment[], body: string, viewer: string) {
-  return nodes.find((n) => n.author?.login === viewer && n.body.trim() === body.trim())?.url;
+  return nodes.find((n) => n.author?.login === viewer && n.body.includes(body.trim()))?.url;
+}
+
+// Nobody has answered the last comment, so a follow-up folds into it rather than
+// pinging someone who may be mid-flow.
+function editableTail(nodes: Comment[], viewer: string) {
+  const last = nodes.at(-1);
+  return last?.author?.login === viewer ? last : undefined;
+}
+
+function folded(tail: Comment, body: string) {
+  return `${tail.body.trimEnd()}\n\n${body.trim()}`;
 }
 
 // A reply is the one call here that is not idempotent, so re-running a plan
@@ -91,46 +106,78 @@ async function readConversation(prId: string): Promise<Comment[]> {
   return JSON.parse(raw || '[]') as Comment[];
 }
 
+// Returns the url of a reply that already exists, else posts or folds one.
+async function replyInThread(item: PlanItem, body: string, viewer: string): Promise<{ url: string; state: State }> {
+  const thread = await readThread(item.threadId!);
+  const existing = duplicateOf(thread.comments, body, viewer);
+  if (existing) return { state: 'duplicate', url: existing };
+
+  const last = editableTail(thread.comments, viewer);
+  if (last?.databaseId) {
+    const url = await api(
+      [
+        '--method',
+        'PATCH',
+        `repos/${thread.repo}/pulls/comments/${last.databaseId}`,
+        '-f',
+        `body=${folded(last, body)}`,
+      ],
+      '.html_url',
+    );
+    return { state: 'ok', url };
+  }
+  if (!thread.replyTo) throw new Error('thread has no comment to reply to');
+  // REST, not addPullRequestReviewThreadReply: that mutation files the reply
+  // under an open pending review, where only its author can read it.
+  const url = await api(
+    [
+      '--method',
+      'POST',
+      `repos/${thread.repo}/pulls/${thread.number}/comments/${thread.replyTo}/replies`,
+      '-F',
+      `body=@${item.bodyFile}`,
+    ],
+    '.html_url',
+  );
+  return { state: 'ok', url };
+}
+
+async function replyInConversation(
+  item: PlanItem,
+  body: string,
+  viewer: string,
+): Promise<{ url: string; state: State }> {
+  const conversation = await readConversation(item.prId!);
+  const existing = duplicateOf(conversation, body, viewer);
+  if (existing) return { state: 'duplicate', url: existing };
+
+  const last = editableTail(conversation, viewer);
+  if (last?.id) {
+    const url = await gql(
+      Q.editComment,
+      ['-f', `id=${last.id}`, '-f', `body=${folded(last, body)}`],
+      '.data.updateIssueComment.issueComment.url',
+    );
+    return { state: 'ok', url };
+  }
+  const url = await gql(
+    Q.comment,
+    ['-f', `subjectId=${item.prId}`, '-F', `body=@${item.bodyFile}`],
+    '.data.addComment.commentEdge.node.url',
+  );
+  return { state: 'ok', url };
+}
+
 async function postReply(item: PlanItem, viewer: string, out: Result): Promise<void> {
   if (!item.bodyFile) return;
   const body = await readFile(item.bodyFile, 'utf8');
 
   try {
-    if (item.threadId) {
-      const thread = await readThread(item.threadId);
-      const existing = duplicateOf(thread.comments, body, viewer);
-      if (existing) {
-        out.reply = 'duplicate';
-        out.replyUrl = existing;
-        return;
-      }
-      if (!thread.replyTo) throw new Error('thread has no comment to reply to');
-      // REST, not addPullRequestReviewThreadReply: that mutation files the reply
-      // under an open pending review, where only its author can read it.
-      out.replyUrl = await api(
-        [
-          '--method',
-          'POST',
-          `repos/${thread.repo}/pulls/${thread.number}/comments/${thread.replyTo}/replies`,
-          '-F',
-          `body=@${item.bodyFile}`,
-        ],
-        '.html_url',
-      );
-    } else {
-      const existing = duplicateOf(await readConversation(item.prId!), body, viewer);
-      if (existing) {
-        out.reply = 'duplicate';
-        out.replyUrl = existing;
-        return;
-      }
-      out.replyUrl = await gql(
-        Q.comment,
-        ['-f', `subjectId=${item.prId}`, '-F', `body=@${item.bodyFile}`],
-        '.data.addComment.commentEdge.node.url',
-      );
-    }
-    out.reply = 'ok';
+    const posted = item.threadId
+      ? await replyInThread(item, body, viewer)
+      : await replyInConversation(item, body, viewer);
+    out.replyUrl = posted.url;
+    out.reply = posted.state;
   } catch (error) {
     out.reply = 'failed';
     out.err = errText(error);
