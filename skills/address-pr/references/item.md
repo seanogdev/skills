@@ -2,7 +2,7 @@
 
 You work one item of feedback on a PR branch: a review comment, a failing CI check, or a point from a local review. Decide it, fix it if it holds up, commit, and draft the reply. The prompt that sent you here gives you the item, the checkout to work in, and a path for the reply.
 
-Push nothing and post nothing. Whoever sent you pushes, replies, votes and resolves.
+Other subagents work other items at the same time, each in its own checkout. Touch only the checkout you were given. Push nothing and post nothing. Whoever sent you pushes, replies, votes and resolves.
 
 Every tool call is a turn, and every turn re-reads the whole context. Batch: put every read you already know you need into one call (several `sed -n` ranges, `grep`s and `git diff`s in one command), and filter test and lint output down to the failures.
 
@@ -61,7 +61,7 @@ A CI fix gets no reply on the PR. The commit is the record.
 
 Fix the cause, not the symptom. Suppressing a warning, skipping a test, loosening an assertion or special-casing the reviewer's input is not a fix. If the real fix is out of scope, decline the comment.
 
-Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. This holds for the smallest fix too. Commit and read the sha back in the same command: `git commit -m MSG && git log -1 --format='%h %H'`. Read every identifier back from its source before it goes in a reply: the shas from `git log`, a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public.
+Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. This holds for the smallest fix too. Commit in your checkout. Read every identifier back from its source before it goes in a reply: a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public. Your commit's sha is not final: the sender cherry-picks it onto the PR branch, which makes a new one. Write the placeholders `SHORT_SHA` and `FULL_SHA` where a reply names it.
 
 ## The reply
 
@@ -88,7 +88,7 @@ Write the reply to the path the prompt gives, whatever it contains. A failing ch
 Moved the normalisation into the transformer ([`a1b2c3d`](https://github.com/OWNER/REPO/commit/a1b2c3d4e5f6789012345678901234567890abcd)).
 ```
 
-Short sha as the link text. Full sha in the href. Read the two back together with `git log -1 --format='%h %H'`.
+Short sha as the link text. Full sha in the href. In your reply file, write them as `SHORT_SHA` and `FULL_SHA`, and the sender fills them in.
 
 **Partially accepted.** Name the part that you took first, with its sha. Then name the part that you did not take, with the evidence that a decline needs. "Renamed the prop ([`b2c3d4e`](…)), but kept the default: the parent sets it on line 12."
 
@@ -101,7 +101,7 @@ Never argue. If a thread turns into back and forth, say so and take it off the P
 A short report and nothing else:
 
 - **Outcome**: one of Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Rerun. Fixed means the problem is gone. A change that hides the symptom is Worked around.
-- **Commit**: `git log -1 --format='%h %H'` for the commit, if you made one.
+- **Commit**: `git log -1 --format='%h %H'` for the commit in your checkout, if you made one.
 - **Evidence**: the `path:line` that backs a decline.
 - **Change**: one line for the summary table, in the voice of the reply. Leave out the outcome word and the file and line: those have their own cells.
 - **Notes**: only what the outcome cannot carry. A workaround's real fix. A call made on thin reasoning. A real defect behind a comment the user voted down. A question for the user.

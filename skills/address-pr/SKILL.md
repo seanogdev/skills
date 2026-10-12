@@ -35,14 +35,22 @@ If the branch has an open PR, CI is part of the pass in either mode. Read `refer
 
 Split the feedback into items, one per distinct point. Each failing check is an item too. Where two items raise the same issue, make them one item, so one commit fixes both. A thread that came back only to accept the last answer or say thanks is not an item: it gets an Acknowledged row in the summary and nothing else.
 
-Hand each item to a subagent, one at a time, since they all commit to the same branch. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass. Run it one tier below your own model. In Claude Code, that is `model: "sonnet"` on the Agent call. In another harness, pick its mid-tier model, or leave the default where the harness offers no choice. You keep the judgment on its return.
+Hand each item to its own subagent and start them all in one turn, so they run in parallel. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass. Run it one tier below your own model. In Claude Code, that is `model: "sonnet"` on the Agent call. In another harness, pick its mid-tier model, or leave the default where the harness offers no choice. You keep the judgment on its return.
 
-Pick the checkout first. If `git worktree list` shows a checkout of the PR branch, use that one. Then send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
+Parallel subagents cannot share one checkout, so give each its own. Pick the PR branch checkout first: if `git worktree list` shows a checkout of the PR branch, use that one. Then, from it, make one worktree per item on a scratch branch at the current head, all in one command:
+
+```bash
+git worktree add -b address-pr/ITEM_N ../WORKTREE_DIR_N HEAD
+```
+
+A fresh worktree has no installed dependencies. The subagent installs what it needs to run the checks it relies on.
+
+Send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
 
 ```
 Work one item of PR feedback. Read SKILL_DIR/references/item.md first and follow it.
 
-Checkout: <full path>
+Checkout: <full path of this item's worktree>
 Reply file: <full path, one per item>
 Item:
 <a comment: url, author, isBot, path:line, isOutdated, whether it came back
@@ -59,7 +67,9 @@ Each subagent returns an outcome, a commit, evidence, a one-line change, and not
 - An Asked outcome on local feedback is a question for the user. Ask it.
 - Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
 
-Batch your own calls the same way: independent reads in one call, and the push with the `git log` that reads the shas back.
+Once every subagent has returned, bring the commits onto the PR branch. In the PR branch checkout, cherry-pick each item's commit in query order with `git cherry-pick`. Where one conflicts, resolve it if the fix is plain. Otherwise abort the pick and send that subagent back with the conflict, in a fresh worktree off the new head. A cherry-pick makes a new sha. So read each item's sha back from the PR branch with `git log`, and replace the `SHORT_SHA` and `FULL_SHA` placeholders in its reply file. Then remove the worktrees and scratch branches: `git worktree remove --force PATH` and `git branch -D address-pr/ITEM_N`.
+
+Batch your own calls: independent reads in one call, and the push with the `git log` that reads the shas back.
 
 Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass with no PR pushes nothing.
 
