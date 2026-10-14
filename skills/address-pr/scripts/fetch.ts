@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Read every piece of feedback on a PR: inline threads, review bodies, conversation, and the CI checks on its head commit.
+// Read every piece of feedback on a PR: inline threads, review bodies, conversation, the CI checks on its head commit, and whether it conflicts with its base.
 // Usage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)
 
 import { die as dieBase, DieError, errText, gh, gql } from './lib.ts';
@@ -16,7 +16,7 @@ try {
   const arg = process.argv[2];
   if (arg === '-h' || arg === '--help') {
     console.log(
-      "Read every piece of feedback on a PR: inline threads, review bodies, conversation, and the CI checks on its head commit.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
+      "Read every piece of feedback on a PR: inline threads, review bodies, conversation, the CI checks on its head commit, and whether it conflicts with its base.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
     );
     process.exit(0);
   }
@@ -46,6 +46,7 @@ query($owner:String!, $repo:String!, $number:Int!) {
     pullRequest(number:$number) {
       id
       baseRefName
+      mergeable
       reviewThreads(first:100) {
         nodes { id isResolved isOutdated path line comments(first:50) { nodes { ...c } } }
       }
@@ -73,6 +74,7 @@ fragment c on Reactable {
   + (.data.repository.pullRequest
   | .baseRefName as $base
   | {prId: .id,
+     mergeable,
      threads: [.reviewThreads.nodes[]
                # Unresolved, plus any thread this account replied in that
                # someone has spoken on since. GitHub leaves a thread
