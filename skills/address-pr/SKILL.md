@@ -55,7 +55,7 @@ Reply file: <full path, one per item>
 Item:
 <a comment: url, author, isBot, path:line, isOutdated, whether it came back
  from an earlier pass, the user's vote, and every comment in the thread>
-<a check: name, url, workflow, runId, jobId, head sha, base branch, and
+<a check: name, url, workflow, runId, jobId, head sha, base branch (`ci.base`), and
  whether it was already rerun>
 <anything the user said about this item>
 ```
