@@ -32,7 +32,7 @@ interface Result {
   err: string;
 }
 
-const JOBS = Number(process.env.ADDRESS_REVIEW_JOBS) || 4;
+const JOBS = Number(process.env.ADDRESS_PR_JOBS) || 4;
 
 const Q = {
   comment: `mutation($subjectId:ID!, $body:String!) {
@@ -73,15 +73,23 @@ function duplicateOf(nodes: Comment[], body: string, viewer: string) {
   return nodes.find((n) => n.author?.login === viewer && n.body.includes(body.trim()))?.url;
 }
 
+// gh posts as the user, so this tells the skill's replies apart from comments
+// the user typed, which it must never edit.
+const MARKER = '<!-- address-pr -->';
+
+function marked(body: string) {
+  return `${body.trim()}\n\n${MARKER}`;
+}
+
 // Nobody has answered the last comment, so a follow-up folds into it rather than
 // pinging someone who may be mid-flow.
 function editableTail(nodes: Comment[], viewer: string) {
   const last = nodes.at(-1);
-  return last?.author?.login === viewer ? last : undefined;
+  return last?.author?.login === viewer && last.body.includes(MARKER) ? last : undefined;
 }
 
 function folded(tail: Comment, body: string) {
-  return `${tail.body.trimEnd()}\n\n${body.trim()}`;
+  return marked(`${tail.body.replace(MARKER, '').trimEnd()}\n\n${body.trim()}`);
 }
 
 // A reply is the one call here that is not idempotent, so re-running a plan
@@ -134,8 +142,8 @@ async function replyInThread(item: PlanItem, body: string, viewer: string): Prom
       '--method',
       'POST',
       `repos/${thread.repo}/pulls/${thread.number}/comments/${thread.replyTo}/replies`,
-      '-F',
-      `body=@${item.bodyFile}`,
+      '-f',
+      `body=${marked(body)}`,
     ],
     '.html_url',
   );
@@ -162,7 +170,7 @@ async function replyInConversation(
   }
   const url = await gql(
     Q.comment,
-    ['-f', `subjectId=${item.prId}`, '-F', `body=@${item.bodyFile}`],
+    ['-f', `subjectId=${item.prId}`, '-f', `body=${marked(body)}`],
     '.data.addComment.commentEdge.node.url',
   );
   return { state: 'ok', url };
@@ -235,8 +243,13 @@ const CHECKS: [(v: PlanItem) => boolean, string][] = [
   [(v) => !v.bodyFile && !v.vote && !v.resolve, 'no reply, vote or resolve'],
 ];
 
-function validate(plan: PlanItem[]): string[] {
+function isPlanItem(v: unknown): v is PlanItem {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function validate(plan: unknown[]): string[] {
   return plan.flatMap((v, i) => {
+    if (!isPlanItem(v)) return [`item ${i}: must be an object`];
     const at = `item ${i} (${v.ref || 'no ref'})`;
     return CHECKS.filter(([check]) => check(v)).map(([, message]) => `${at}: ${message}`);
   });

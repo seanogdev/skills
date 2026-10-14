@@ -45,6 +45,7 @@ query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
     pullRequest(number:$number) {
       id
+      baseRefName
       reviewThreads(first:100) {
         nodes { id isResolved isOutdated path line comments(first:50) { nodes { ...c } } }
       }
@@ -70,6 +71,7 @@ fragment c on Reactable {
   const jq = `.data.viewer.login as $viewer
   | {viewer: $viewer}
   + (.data.repository.pullRequest
+  | .baseRefName as $base
   | {prId: .id,
      threads: [.reviewThreads.nodes[]
                # Unresolved, plus any thread this account replied in that
@@ -95,9 +97,10 @@ fragment c on Reactable {
                | if .__typename == "CheckRun"
                  then {name, state: (.conclusion // "PENDING"), url: .detailsUrl,
                        workflow: .checkSuite.workflowRun.workflow.name,
-                       runId: .checkSuite.workflowRun.databaseId, jobId: .databaseId}
+                       runId: .checkSuite.workflowRun.databaseId,
+                       jobId: (if .checkSuite.workflowRun == null then null else .databaseId end)}
                  else {name: .context, state, url: .targetUrl} end] as $checks
-              | {sha: $head.oid, state,
+              | {sha: $head.oid, base: $base, state,
                  failing: [$checks[] | select(.state | IN("SUCCESS", "SKIPPED", "NEUTRAL", "PENDING", "EXPECTED") | not)],
                  pending: [$checks[] | select(.state | IN("PENDING", "EXPECTED"))]}
             end)})`;
