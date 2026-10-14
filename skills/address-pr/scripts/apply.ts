@@ -32,7 +32,7 @@ interface Result {
   err: string;
 }
 
-const JOBS = Number(process.env.ADDRESS_REVIEW_JOBS) || 4;
+const JOBS = Number(process.env.ADDRESS_PR_JOBS) || 4;
 
 const Q = {
   comment: `mutation($subjectId:ID!, $body:String!) {
