@@ -31,6 +31,10 @@ The mode file holds the rules this file does not repeat.
 
 If the branch has an open PR, CI is part of the pass in either mode. Read `references/ci.md` too. A PR with no CI is not a failing PR.
 
+## Conflicts with the base
+
+If the branch has an open PR, read `mergeable` from `node scripts/fetch.ts` in either mode. `CONFLICTING` means you resolve the conflicts before you make any worktree, so each item starts from the updated head. Invoke the `resolve-conflicts` skill on the PR branch and let it push. If that skill is not installed, merge the base into the PR branch, resolve each conflict so that both sides keep their intent, run the project's checks, and push. Then run `fetch.ts` again, because the push replaced the head that `ci` describes. `UNKNOWN` means GitHub has not computed it yet: read again after a short wait.
+
 ## Working the items
 
 Split the feedback into items, one per distinct point. Each failing check is an item too. Where two items raise the same issue, make them one item, so one commit fixes both. A thread that came back only to accept the last answer or say thanks is not an item: it gets an Acknowledged row in the summary and nothing else.
@@ -75,7 +79,7 @@ Push to the PR branch once, after the last item and **before** any reply goes ou
 
 ## Finishing
 
-**Re-read the feedback.** Run `node scripts/fetch.ts` again, or read the local file again: a reviewer may have commented during the pass, and the user may have changed the ask since. Anything new becomes an item. A thread that comes back unresolved with your own reply last is one where the vote or the resolve did not land: cast and resolve it now. Then wait for CI on the final head as `references/ci.md` says. Move on once a fresh read has nothing left to act on and no check on the head fails or is still running.
+**Re-read the feedback.** Run `node scripts/fetch.ts` again, or read the local file again: a reviewer may have commented during the pass, and the user may have changed the ask since. Anything new becomes an item. `mergeable: CONFLICTING` means the base moved during the pass: resolve it as **Conflicts with the base** says. A thread that comes back unresolved with your own reply last is one where the vote or the resolve did not land: cast and resolve it now. Then wait for CI on the final head as `references/ci.md` says. Move on once a fresh read has nothing left to act on and no check on the head fails or is still running.
 
 **Bring the PR description up to date**, once, wherever the branch has an open PR. If the fixes changed what the branch does or made a claim in the body false, write the body again for the branch as it stands, and post it with `gh pr edit --body-file`. That replaces the whole body, so keep every image, video and `user-attachments` link the author added, with its heading and caption, and every issue or PR reference the diff cannot regenerate. Remove a claim that no longer holds, and put no revision history or note in its place. If the fixes changed nothing the body states, leave it.
 
@@ -102,4 +106,5 @@ Under the table, add only what a row cannot carry:
 - Every point worked around rather than fixed, and what the real fix is.
 - Any thread left open, and any automated comment left unvoted.
 - Any check that still fails on the head, and why.
+- Each conflict resolution with the base, with the report that `resolve-conflicts` gave.
 - Anything that needs the user's call.

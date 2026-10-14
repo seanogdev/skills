@@ -6,7 +6,7 @@ Each path below is relative to the skill directory, the one that holds `SKILL.md
 
 ## Reading the checks
 
-`node scripts/fetch.ts [PR]` returns a `ci` field for the head commit of the PR. Read it at the start of the pass, together with the feedback. On a local pass, run the same command and use only that field.
+`node scripts/fetch.ts [PR]` returns a `ci` field for the head commit of the PR. Read it at the start of the pass, together with the feedback. On a local pass, run the same command and use only that field and `mergeable`.
 
 - **`ci: null`** means no check reported on the head commit. On the first read of the pass, the PR has no CI. No CI is not a failing CI. There is nothing to fix and nothing to wait for. The summary says "No CI on this PR" one time, under the table, and has no CI rows.
 - **`failing`** holds each check that ended in a state other than `SUCCESS`, `SKIPPED` or `NEUTRAL`. Each one is an item of the pass.
