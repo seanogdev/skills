@@ -33,7 +33,7 @@ If the branch has an open PR, CI is part of the pass in either mode. Read `refer
 
 ## Conflicts with the base
 
-If the branch has an open PR, read `mergeable` from `node scripts/fetch.ts` in either mode. `CONFLICTING` means you resolve the conflicts before you make any worktree, so each item starts from the updated head. Invoke the `resolve-conflicts` skill on the PR branch and let it push. If that skill is not installed, merge the base into the PR branch, resolve each conflict so that both sides keep their intent, run the project's checks, and push. Then run `fetch.ts` again, because the push replaced the head that `ci` describes. `UNKNOWN` means GitHub has not computed it yet: read again after a short wait.
+If the branch has an open PR, read `mergeable` from `node scripts/fetch.ts` in either mode. `CONFLICTING` means you resolve the conflicts before you make any worktree, so each item starts from the updated head. Invoke the `resolve-conflicts` skill on the PR branch and let it push. If that skill is not installed, merge the base into the PR branch, resolve each conflict so that both sides keep their intent, run the project's checks, and push. Then run `fetch.ts` again, because the push replaced the head that `ci` describes. `UNKNOWN` means GitHub has not computed it yet: read again after a short wait. A local pass that will not push resolves nothing: the summary names the conflict.
 
 ## Working the items
 
@@ -75,13 +75,13 @@ Once every subagent has returned, bring the commits onto the PR branch. In the P
 
 Batch your own calls: independent reads in one call, and the push with the `git log` that reads the shas back.
 
-Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass with no PR pushes nothing.
+Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass pushes nothing, unless the user named the PR or asked to push or post, as `references/local.md` says.
 
 ## Finishing
 
 **Re-read the feedback.** Run `node scripts/fetch.ts` again, or read the local file again: a reviewer may have commented during the pass, and the user may have changed the ask since. Anything new becomes an item. `mergeable: CONFLICTING` means the base moved during the pass: resolve it as **Conflicts with the base** says. A thread that comes back unresolved with your own reply last is one where the vote or the resolve did not land: cast and resolve it now. Then wait for CI on the final head as `references/ci.md` says. Move on once a fresh read has nothing left to act on and no check on the head fails or is still running.
 
-**Bring the PR description up to date**, once, wherever the branch has an open PR. If the fixes made a claim in the body false, or changed what the branch does, edit only the sentences that no longer hold. Add a sentence where the branch now does something the body does not say. Post the result with `gh pr edit --body-file`. That replaces the whole body, so copy every other line unchanged: each template heading, each checkbox and its state, each image, video and `user-attachments` link with its caption, and each issue or PR reference. Add no new section, and do not rewrite text that is still true. Remove a claim that no longer holds, and put no revision history or note in its place. If the fixes changed nothing the body states or should state, leave it.
+**Bring the PR description up to date**, once, wherever this pass pushed to an open PR. If the fixes made a claim in the body false, or changed what the branch does, edit only the sentences that no longer hold. Add a sentence where the branch now does something the body does not say. Post the result with `gh pr edit --body-file`. That replaces the whole body, so copy every other line unchanged: each template heading, each checkbox and its state, each image, video and `user-attachments` link with its caption, and each issue or PR reference. Add no new section, and do not rewrite text that is still true. Remove a claim that no longer holds, and put no revision history or note in its place. If the fixes changed nothing the body states or should state, leave it.
 
 ## Summary
 

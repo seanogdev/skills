@@ -20,6 +20,8 @@ Each failing check is an item, worked by a subagent as **Working the items** in 
 
 ## Waiting for the head
 
+This section applies only when the pass pushed. A local pass that did not push has no new head to wait for.
+
 Each push starts CI again on the new head. A rerun starts it again on the same head. Before the summary, wait for the checks on the final head to finish. Start one watch, with its output in a file:
 
 ```bash

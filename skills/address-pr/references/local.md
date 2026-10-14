@@ -14,7 +14,9 @@ Every item is live. Nothing in `references/github.md` applies. What stands in fo
 
 Work the items as **Working the items** in `SKILL.md` says.
 
-If the branch has an open PR, push. Then leave one comment on the PR that says what changed this round and why, so the new commits are accounted for on the PR. Keep it to a line per point. Each line opens with its outcome and names its sha. Build it from the subagents' replies.
+Push and post only when the user named the PR or asked to push or post. A local review is not a request to write on a PR. Otherwise the commits stay on the branch. The summary says so and names the PR that the branch has, if any, so the user can ask for the push.
+
+When you do push, leave one comment on the PR that says what changed this round and why, so the new commits are accounted for on the PR. Keep it to a line per point. Each line opens with its outcome and names its sha. Build it from the subagents' replies.
 
 Post it through `apply.ts` as a single item with only a `prId` and a `bodyFile`:
 
@@ -26,4 +28,4 @@ Post it through `apply.ts` as a single item with only a `prId` and a `bodyFile`:
 
 That comment is the only place the round goes. The PR description follows **Finishing** in `SKILL.md`, as on any pass.
 
-If the branch has no PR, push nothing unless the user asks. The summary is the whole of the output. Leave the feedback file itself as it is either way.
+Leave the feedback file itself as it is.
