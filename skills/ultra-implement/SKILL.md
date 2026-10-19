@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 `$ARGUMENTS` holds the parent issue. If it is empty, ask for it and stop.
 
-Call the Workflow tool with `scriptPath` set to `workflow.js` in this skill's directory and `args` set to `{ "parent": "<the parent issue>" }`. Typing this skill's command is the user's opt-in to the workflow.
+Read `workflow.js` in this skill's directory. Call the Workflow tool with its full contents as `script` and `args` set to `{ "parent": "<the parent issue>" }`. The tool refuses a `scriptPath` outside the working directory. Typing this skill's command is the user's opt-in to the workflow.
 
 The workflow:
 
