@@ -20,6 +20,12 @@ export default defineConfig({
         'no-console': 'off',
       },
     },
+    {
+      files: ['tests/**/*.ts'],
+      rules: {
+        'typescript/no-floating-promises': 'off',
+      },
+    },
   ],
   plugins: ['typescript', 'unicorn', 'oxc', 'import', 'promise'],
   rules: {
