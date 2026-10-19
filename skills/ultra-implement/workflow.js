@@ -1,0 +1,233 @@
+export const meta = {
+  description: 'Implement every sub-issue of a parent issue as stacked PRs, in dependency order',
+  name: 'ultra-implement',
+  phases: [
+    { title: 'Plan', detail: 'read the parent spec and order the sub-issues' },
+    { title: 'Implement', detail: 'one agent per sub-issue, in its own worktree' },
+    { title: 'Review', detail: 'correctness, design and spec reviewers per PR' },
+    { title: 'Finish', detail: 'fix findings, test, screenshots, move the issue' },
+  ],
+  whenToUse: 'Run through the ultra-implement skill with the parent issue as args',
+};
+
+const parent = typeof args === 'string' ? args : args && args.parent;
+if (!parent) throw new Error('Pass the parent issue link or reference as args');
+
+const PLAN_SCHEMA = {
+  properties: {
+    defaultBranch: { type: 'string' },
+    subIssues: {
+      items: {
+        properties: {
+          id: { type: 'string' },
+          predecessors: { items: { type: 'string' }, type: 'array' },
+          reason: { type: 'string' },
+          skip: { type: 'boolean' },
+          title: { type: 'string' },
+          url: { type: 'string' },
+        },
+        required: ['id', 'title', 'predecessors', 'skip'],
+        type: 'object',
+      },
+      type: 'array',
+    },
+  },
+  required: ['defaultBranch', 'subIssues'],
+  type: 'object',
+};
+
+const IMPLEMENT_SCHEMA = {
+  properties: {
+    branch: { type: 'string' },
+    prUrl: { type: 'string' },
+    reason: { type: 'string' },
+    status: { enum: ['pr_opened', 'blocked', 'failed'] },
+  },
+  required: ['status'],
+  type: 'object',
+};
+
+const FINDINGS_SCHEMA = {
+  properties: {
+    findings: {
+      items: {
+        properties: {
+          file: { type: 'string' },
+          fix: { type: 'string' },
+          line: { type: 'number' },
+          problem: { type: 'string' },
+        },
+        required: ['file', 'problem'],
+        type: 'object',
+      },
+      type: 'array',
+    },
+  },
+  required: ['findings'],
+  type: 'object',
+};
+
+const FINISH_SCHEMA = {
+  properties: {
+    reason: { type: 'string' },
+    status: { enum: ['ready', 'failed'] },
+  },
+  required: ['status'],
+  type: 'object',
+};
+
+const LENSES = [
+  {
+    focus:
+      'Logic bugs, regressions, security holes, type gaps, missing or weak tests, and breaks of the conventions in the project instructions.',
+    key: 'correctness',
+  },
+  {
+    focus:
+      'New options that could be derived, values that must be kept in sync, a parallel construct beside an existing one, related code or consumers left inconsistent, and code in the wrong layer.',
+    key: 'design',
+  },
+  {
+    focus:
+      'Each acceptance criterion of the sub-issue and each rule of the parent spec that applies to it: met, missed, or done differently without a reason.',
+    key: 'spec',
+  },
+];
+
+const TRACKER = `The parent issue is ${parent}. Read it, and its sub-issues, with the issue tracker tools that this session has (an MCP server or a CLI). Follow the tracker conventions in the project instructions, if any.`;
+
+const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
+
+phase('Plan');
+const plan = await agent(
+  `${TRACKER}
+The parent's description is the spec for every sub-issue. Do not change anything.
+
+Return:
+- defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
+- subIssues: each sub-issue that is not done, with its id, title and url. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
+- skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.`,
+  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
+);
+
+const { subIssues } = plan;
+const byId = new Map(subIssues.map((s) => [s.id, s]));
+
+const indegree = new Map(subIssues.map((s) => [s.id, 0]));
+for (const s of subIssues) {
+  s.predecessors = s.predecessors.filter((id) => byId.has(id) && id !== s.id);
+  indegree.set(s.id, s.predecessors.length);
+}
+const queue = subIssues.filter((s) => indegree.get(s.id) === 0).map((s) => s.id);
+const ordered = new Set();
+while (queue.length > 0) {
+  const id = queue.shift();
+  ordered.add(id);
+  for (const s of subIssues) {
+    if (!s.predecessors.includes(id)) continue;
+    indegree.set(s.id, indegree.get(s.id) - 1);
+    if (indegree.get(s.id) === 0) queue.push(s.id);
+  }
+}
+for (const s of subIssues) {
+  if (ordered.has(s.id)) continue;
+  s.skip = true;
+  s.reason = 'Its dependency links form a cycle';
+  s.predecessors = [];
+}
+log(`${subIssues.length} open sub-issues, ${subIssues.filter((s) => s.skip).length} skipped`);
+
+function label(s) {
+  return `${s.id} ${s.title}`;
+}
+
+function implementPrompt(s, bases) {
+  const base = bases[0] || plan.defaultBranch;
+  const merges = bases.slice(1);
+  return `${TRACKER}
+Implement sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}. The parent's description is the spec. State the sub-issue title before you start.
+
+1. Move the sub-issue to the in-progress stage. If the move fails, stop and return failed.
+2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
+3. Build only what the sub-issue asks for. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
+4. ${TESTING}
+5. Commit in small logical steps and push.
+6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.
+
+If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
+}
+
+function reviewPrompt(s, impl, base, lens) {
+  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}. The diff is git diff origin/${base}...origin/${impl.branch} (git fetch first). ${TRACKER}
+Report only the ${lens.key} problems: ${lens.focus}
+Read only. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
+}
+
+function finishPrompt(s, impl, findings) {
+  return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+git fetch and check out ${impl.branch}.
+${findings.length > 0 ? `Reviewers found these problems. Fix each one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
+Then make sure the PR meets this rule: ${TESTING}
+Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
+Move the sub-issue to the in-review stage only when all of this passes. Return failed, with the reason, when it does not.`;
+}
+
+const runs = new Map();
+
+function run(s) {
+  if (runs.has(s.id)) return runs.get(s.id);
+  const result = (async () => {
+    const summary = { id: s.id, title: s.title, url: s.url };
+    if (s.skip) return { ...summary, reason: s.reason, status: 'skipped' };
+
+    const before = await Promise.all(s.predecessors.map((id) => run(byId.get(id))));
+    const waiting = before.filter((r) => r.status !== 'ready');
+    if (waiting.length > 0) {
+      return { ...summary, reason: `Waits on ${waiting.map((r) => r.id).join(', ')}`, status: 'blocked' };
+    }
+
+    const bases = before.map((r) => r.branch);
+    const base = bases[0] || plan.defaultBranch;
+    const impl = await agent(implementPrompt(s, bases), {
+      isolation: 'worktree',
+      label: `implement:${s.id}`,
+      phase: 'Implement',
+      schema: IMPLEMENT_SCHEMA,
+    });
+    if (!impl) return { ...summary, reason: 'The implement agent stopped', status: 'failed' };
+    if (impl.status !== 'pr_opened') return { ...summary, ...impl };
+
+    const reviews = await parallel(
+      LENSES.map(
+        (lens) => () =>
+          agent(reviewPrompt(s, impl, base, lens), {
+            label: `review:${lens.key}:${s.id}`,
+            phase: 'Review',
+            schema: FINDINGS_SCHEMA,
+          }),
+      ),
+    );
+    const findings = reviews.filter(Boolean).flatMap((r) => r.findings);
+
+    const finish = await agent(finishPrompt(s, impl, findings), {
+      isolation: 'worktree',
+      label: `finish:${s.id}`,
+      phase: 'Finish',
+      schema: FINISH_SCHEMA,
+    });
+    if (!finish)
+      return {
+        ...summary,
+        branch: impl.branch,
+        prUrl: impl.prUrl,
+        reason: 'The finish agent stopped',
+        status: 'failed',
+      };
+    return { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
+  })();
+  runs.set(s.id, result);
+  return result;
+}
+
+const results = await Promise.all(subIssues.map(run));
+return { parent, results };
