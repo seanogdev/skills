@@ -36,6 +36,16 @@ const PLAN_SCHEMA = {
   type: 'object',
 };
 
+const PREFLIGHT_SCHEMA = {
+  properties: {
+    browser: { enum: ['ready', 'not_needed', 'blocked'] },
+    notes: { type: 'string' },
+    reason: { type: 'string' },
+  },
+  required: ['browser', 'notes'],
+  type: 'object',
+};
+
 const IMPLEMENT_SCHEMA = {
   properties: {
     branch: { type: 'string' },
@@ -97,19 +107,38 @@ const LENSES = [
 
 const TRACKER = `The parent issue is ${parent}. Read it, and its sub-issues, with the issue tracker tools that this session has (an MCP server or a CLI). Follow the tracker conventions in the project instructions, if any.`;
 
-const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
-
 phase('Plan');
-const plan = await agent(
-  `${TRACKER}
+const [plan, preflight] = await Promise.all([
+  agent(
+    `${TRACKER}
 The parent's description is the spec for every sub-issue. Do not change anything.
 
 Return:
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
 - subIssues: each sub-issue that is not done, with its id, title and url. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.`,
-  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
-);
+    { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
+  ),
+  agent(
+    `${TRACKER}
+Find out how this repo's app is checked in a real browser, from the project instructions and the docs they point to. Change no code and no tracker item.
+If no sub-issue changes something visible in the app, return not_needed.
+Otherwise start the dev server from this checkout, open the app in a browser session of your own, and confirm that the saved login reaches the app. Find test data on this account that the sub-issues can use: ids that exist and hold the data they need. Then stop the dev server and close the session.
+Return ready, with notes on how to start the dev server and find its port, how to log in, how to override feature flags, and the test data ids. Return blocked, with the reason, when the dev server or the login does not work.`,
+    { label: 'preflight', phase: 'Plan', schema: PREFLIGHT_SCHEMA },
+  ),
+]);
+if (!plan) throw new Error('The plan agent stopped');
+if (preflight && preflight.browser === 'blocked') {
+  log(`Browser preflight blocked: ${preflight.reason}`);
+  return { parent, preflight, results: [] };
+}
+
+const BROWSER_SETUP =
+  preflight && preflight.browser === 'ready'
+    ? `\nBrowser setup, checked at the start of this run:\n${preflight.notes}`
+    : '';
+const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.${BROWSER_SETUP}`;
 
 const { subIssues } = plan;
 const byId = new Map(subIssues.map((s) => [s.id, s]));
