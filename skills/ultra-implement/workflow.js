@@ -71,7 +71,7 @@ const FINISH_SCHEMA = {
   properties: {
     reason: { type: 'string' },
     stage: { type: 'string' },
-    status: { enum: ['ready', 'failed'] },
+    status: { enum: ['ready', 'needs_person', 'failed'] },
   },
   required: ['status'],
   type: 'object',
@@ -172,7 +172,8 @@ git fetch, then git switch --detach origin/${impl.branch}. The branch itself sta
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
 Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
-Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage. Return failed, with the reason, when it does not.`;
+Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage.
+Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse). Leave the sub-issue in progress, and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }
 
 const runs = new Map();
@@ -184,7 +185,7 @@ function run(s) {
     if (s.skip) return { ...summary, reason: s.reason, status: 'skipped' };
 
     const before = await Promise.all(s.predecessors.map((id) => run(byId.get(id))));
-    const waiting = before.filter((r) => r.status !== 'ready');
+    const waiting = before.filter((r) => r.status !== 'ready' && r.status !== 'needs_person');
     if (waiting.length > 0) {
       return { ...summary, reason: `Waits on ${waiting.map((r) => r.id).join(', ')}`, status: 'blocked' };
     }

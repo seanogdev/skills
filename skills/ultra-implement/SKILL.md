@@ -16,8 +16,8 @@ The workflow:
 2. Orders the open sub-issues by their dependency links. It skips the ones that need a person (a release, a sign-off, an open decision) and the ones in a dependency cycle.
 3. Starts each sub-issue when its predecessors are ready, in its own worktree. The branch and the PR base are the predecessor's branch, or the default branch when there is none.
 4. Per sub-issue: implement with tests first, browser checks and screenshots where the change is visible, a PR, then correctness, design and spec reviewers in parallel, then a finisher that fixes the findings, re-checks the tests and moves the issue to review.
-5. Stops a sub-issue that needs a change outside the repo, and blocks the sub-issues after it.
+5. Stops a sub-issue that needs a change outside the repo, and blocks the sub-issues after it. A sub-issue whose only open checks need a person to set up returns needs_person and does not block the ones after it.
 
 For an unattended run, start the session in auto permission mode, then send it to the background.
 
-When the workflow returns, give a table with one row per sub-issue: the issue, the PR link, the status, and the tracker stage. Add the reason for each skipped, blocked or failed one. Then list what the user must do next: the blocked backend changes, the skipped sub-issues, and the PRs to review.
+When the workflow returns, give a table with one row per sub-issue: the issue, the PR link, the status, and the tracker stage. Add the reason for each skipped, blocked, needs_person or failed one. Then list what the user must do next: the blocked backend changes, the checks that need a person, the skipped sub-issues, and the PRs to review.
