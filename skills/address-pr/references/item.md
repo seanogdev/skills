@@ -12,6 +12,8 @@ Check the claim before you act on it. Read the surrounding file, not only the di
 
 The comment was written against some commit, and the branch has probably moved since. Check the file as it stands now, not the snippet quoted in the comment and not the diff hunk it was raised against. A later commit can fix what the comment describes, move the line it points at, or change the code around it. If the line number or the quoted code no longer matches the file, that gap is itself a sign the code moved on. The current version decides the call.
 
+When this PR changed the flagged line, find the purpose of that change before you fix it. Read the commit that made it (`git log -L LINE,LINE:FILE origin/BASE..HEAD`) and the part of the PR body that names it (`gh pr view PR --json body`). The change was often the fix of a different problem. Your fix must keep that purpose. Check each case that the change was for, not only the case that the reviewer names.
+
 Fix it if the claim holds up. Fix it also if the reviewer points at a real risk, even where you would pick a different fix. Say so if it does not hold up. Decline it in these cases:
 
 - The comment misreads the code.
@@ -61,7 +63,7 @@ A CI fix gets no reply on the PR. The commit is the record.
 
 Fix the cause, not the symptom. Suppressing a warning, skipping a test, loosening an assertion or special-casing the reviewer's input is not a fix. If the real fix is out of scope, decline the comment.
 
-Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. This holds for the smallest fix too. Commit in your checkout. Read every identifier back from its source before it goes in a reply: a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public. Your commit's sha is not final: the sender cherry-picks it onto the PR branch, which makes a new one. Write the placeholders `SHORT_SHA` and `FULL_SHA` where a reply names it.
+Make the fix in the checkout the prompt names. Make one commit for the item, and keep it to the fix for that one item. Commit through the repo's hooks. If a hook fails for a cause outside your fix, stop and return the hook output in your notes; `--no-verify` hides the checks that the hook runs. This holds for the smallest fix too. Commit in your checkout. Read every identifier back from its source before it goes in a reply: a line number from the file as it now stands, an issue number from `gh`. Never quote one from memory. A wrong one has to be corrected in public. Your commit's sha is not final: the sender cherry-picks it onto the PR branch, which makes a new one. Write the placeholders `SHORT_SHA` and `FULL_SHA` where a reply names it.
 
 ## The reply
 
@@ -102,6 +104,6 @@ A short report and nothing else:
 
 - **Outcome**: one of Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Rerun. Fixed means the problem is gone. A change that hides the symptom is Worked around.
 - **Commit**: `git log -1 --format='%h %H'` for the commit in your checkout, if you made one.
-- **Evidence**: the `path:line` that backs a decline.
+- **Evidence**: the `path:line` that backs a decline. For a fix to a line that this PR changed, the purpose of that change and how the fix keeps it.
 - **Change**: one line for the summary table, in the voice of the reply. Leave out the outcome word and the file and line: those have their own cells.
 - **Notes**: only what the outcome cannot carry. A workaround's real fix. A call made on thin reasoning. A real defect behind a comment the user voted down. A question for the user.

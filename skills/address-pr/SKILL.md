@@ -47,7 +47,7 @@ Parallel subagents cannot share one checkout, so give each its own. Pick the PR 
 git worktree add -b address-pr/ITEM_N ../WORKTREE_DIR_N HEAD
 ```
 
-A fresh worktree has no installed dependencies. The subagent installs what it needs to run the checks it relies on.
+A fresh worktree has no installed dependencies, so its commit hooks and checks fail. In the same command, install them in each worktree with the repo's lockfile install, for example `pnpm install --frozen-lockfile --prefer-offline`. Each subagent then commits through the hooks.
 
 Send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
 
@@ -58,7 +58,8 @@ Checkout: <full path of this item's worktree>
 Reply file: <full path, one per item>
 Item:
 <a comment: url, author, isBot, path:line, isOutdated, whether it came back
- from an earlier pass, the user's vote, and every comment in the thread>
+ from an earlier pass, the user's vote, base branch (`ci.base`), and every
+ comment in the thread>
 <a check: name, url, workflow, runId, jobId, head sha, base branch (`ci.base`), and
  whether it was already rerun>
 <anything the user said about this item>
@@ -67,6 +68,7 @@ Item:
 Each subagent returns an outcome, a commit, evidence, a one-line change, and notes. Weigh each return before you act on it:
 
 - Read the evidence line yourself before you accept a decline of a comment the user voted up.
+- Read the evidence line of a Fixed return when this PR changed the flagged line. The fix must keep the purpose of that change.
 - If a return does not hold up, send the same subagent back with what is wrong, rather than a fresh one.
 - An Asked outcome on local feedback is a question for the user. Ask it.
 - Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
