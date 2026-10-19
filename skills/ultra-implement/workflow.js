@@ -164,7 +164,7 @@ while (queue.length > 0) {
 for (const s of subIssues) {
   if (ordered.has(s.id)) continue;
   s.skip = true;
-  s.reason = 'Its dependency links form a cycle';
+  s.reason = 'It is in a dependency cycle, or waits on one';
   s.predecessors = [];
 }
 log(`${subIssues.length} open sub-issues, ${subIssues.filter((s) => s.skip).length} skipped`);
