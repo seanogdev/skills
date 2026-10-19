@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          require-lockfile: true
+      - run: pnpm lint
+      # `pnpm lint` runs with `--fix`, so a diff means it found a problem.
+      - run: git diff --exit-code
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
