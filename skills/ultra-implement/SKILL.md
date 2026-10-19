@@ -20,4 +20,4 @@ The workflow:
 
 For an unattended run, start the session in auto permission mode, then send it to the background.
 
-When the workflow returns, give a table with one row per sub-issue: the issue, the PR link, and the status. Add the reason for each skipped, blocked or failed one. Then list what the user must do next: the blocked backend changes, the skipped sub-issues, and the PRs to review.
+When the workflow returns, give a table with one row per sub-issue: the issue, the PR link, the status, and the tracker stage. Add the reason for each skipped, blocked or failed one. Then list what the user must do next: the blocked backend changes, the skipped sub-issues, and the PRs to review.

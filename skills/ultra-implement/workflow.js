@@ -70,6 +70,7 @@ const FINDINGS_SCHEMA = {
 const FINISH_SCHEMA = {
   properties: {
     reason: { type: 'string' },
+    stage: { type: 'string' },
     status: { enum: ['ready', 'failed'] },
   },
   required: ['status'],
@@ -147,12 +148,13 @@ function implementPrompt(s, bases) {
   return `${TRACKER}
 Implement sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}. The parent's description is the spec. State the sub-issue title before you start.
 
-1. Move the sub-issue to the in-progress stage. If the move fails, stop and return failed.
+1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
 2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
 3. Build only what the sub-issue asks for. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
 4. ${TESTING}
 5. Commit in small logical steps and push.
 6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.
+7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The finish step moves it after the review.
 
 If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
 }
@@ -170,7 +172,7 @@ git fetch, then git switch --detach origin/${impl.branch}. The branch itself sta
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
 Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
-Move the sub-issue to the in-review stage only when all of this passes. Return failed, with the reason, when it does not.`;
+Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage. Return failed, with the reason, when it does not.`;
 }
 
 const runs = new Map();
