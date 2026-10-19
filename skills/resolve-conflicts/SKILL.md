@@ -2,7 +2,7 @@
 name: resolve-conflicts
 description: Resolve the merge conflicts on a branch, have the resolution reviewed, fix what the review finds, and push. Use when the user says "resolve the conflicts", "fix the merge conflicts", "this PR has conflicts", "update my branch with main", "rebase onto main and sort out the conflicts", or a merge, rebase or cherry-pick stops on a conflict. Not for addressing review comments, merging a PR into its base, or a first review of a branch.
 license: MIT
-argument-hint: "[PR number, url or branch] [base branch]"
+argument-hint: '[PR number, url or branch] [base branch]'
 ---
 
 Bring a branch up to date with its base. Resolve every conflict so that both sides keep what they meant to do. Then get a fresh review of the resolution, take each finding to a conclusion, and push. Account for the whole pass to the user at the end.

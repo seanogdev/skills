@@ -4,7 +4,10 @@
   { "query": "my reviewer left a bunch of comments on review.md, handle them", "should_trigger": true },
   { "query": "someone flagged issues in code review, get them all sorted please", "should_trigger": true },
   { "query": "respond to the open comments on this pull request", "should_trigger": true },
-  { "query": "the reviewer keeps going back and forth, just take every comment to a conclusion", "should_trigger": true },
+  {
+    "query": "the reviewer keeps going back and forth, just take every comment to a conclusion",
+    "should_trigger": true
+  },
   { "query": "CI is failing on my PR, can you sort it out", "should_trigger": true },
   { "query": "address PR 512", "should_trigger": true },
   { "query": "the lint job is red on this branch's pull request, fix it", "should_trigger": true },

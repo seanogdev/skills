@@ -2,7 +2,7 @@
 name: ultra-implement
 description: Implement every sub-issue of a parent issue as its own PR, unattended. Sub-issues run in dependency order, and the ones whose predecessors are ready run in parallel. Each PR gets tests, browser checks and screenshots where they fit, and a three-lens review. Run it by typing /ultra-implement with the parent issue.
 license: MIT
-argument-hint: "<parent issue link or reference>"
+argument-hint: '<parent issue link or reference>'
 disable-model-invocation: true
 ---
 
