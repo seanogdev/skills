@@ -2,10 +2,10 @@ export const meta = {
   description: 'Implement every sub-issue of a parent issue as stacked PRs, in dependency order',
   name: 'ultra-implement',
   phases: [
-    { title: 'Plan', detail: 'read the parent spec and order the sub-issues' },
-    { title: 'Implement', detail: 'one agent per sub-issue, in its own worktree' },
-    { title: 'Review', detail: 'correctness, design and spec reviewers per PR' },
-    { title: 'Finish', detail: 'fix findings, test, screenshots, move the issue' },
+    { detail: 'read the parent spec and order the sub-issues', title: 'Plan' },
+    { detail: 'one agent per sub-issue, in its own worktree', title: 'Implement' },
+    { detail: 'correctness, design and spec reviewers per PR', title: 'Review' },
+    { detail: 'fix findings, test, screenshots, move the issue', title: 'Finish' },
   ],
   whenToUse: 'Run through the ultra-implement skill with the parent issue as args',
 };
@@ -158,14 +158,15 @@ If the work needs a change outside this repo (a backend endpoint, an API spec, a
 }
 
 function reviewPrompt(s, impl, base, lens) {
-  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}. The diff is git diff origin/${base}...origin/${impl.branch} (git fetch first). ${TRACKER}
+  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}. ${TRACKER}
+git fetch, then read the change with git diff origin/${base}...origin/${impl.branch}, and any file at the branch with git show origin/${impl.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
 Report only the ${lens.key} problems: ${lens.focus}
 Read only. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
 }
 
 function finishPrompt(s, impl, findings) {
   return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
-git fetch and check out ${impl.branch}.
+git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 ${findings.length > 0 ? `Reviewers found these problems. Fix each one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
 Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
