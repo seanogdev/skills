@@ -107,6 +107,8 @@ const LENSES = [
 
 const TRACKER = `The parent issue is ${parent}. Read it, and its sub-issues, with the issue tracker tools that this session has (an MCP server or a CLI). Follow the tracker conventions in the project instructions, if any.`;
 
+const WORKTREE = `You work in a fresh worktree: install the dependencies before the first build or test. Write files with the file tools, and run one plain command per shell call, since the worktree guard refuses heredocs, loops and shell variables. Give every wait a timeout, and when it runs out, find out why. Before you return, stop each dev server and browser session that you started.`;
+
 phase('Plan');
 const [plan, preflight] = await Promise.all([
   agent(
@@ -176,6 +178,7 @@ function implementPrompt(s, bases) {
   const merges = bases.slice(1);
   return `${TRACKER}
 Implement sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}. The parent's description is the spec. State the sub-issue title before you start.
+${WORKTREE}
 
 1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
 2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
@@ -197,6 +200,7 @@ Read only. Behaviour that the parent spec or the sub-issue asks for is the targe
 
 function finishPrompt(s, impl, findings) {
   return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+${WORKTREE}
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
