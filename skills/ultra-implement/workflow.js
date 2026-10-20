@@ -6,6 +6,7 @@ export const meta = {
     { detail: 'one agent per sub-issue, in its own worktree', title: 'Implement' },
     { detail: 'correctness, design and spec reviewers per PR', title: 'Review' },
     { detail: 'fix findings, test, screenshots, move the issue', title: 'Finish' },
+    { detail: 'wait for CI and the CI review, then address the PR', title: 'Address' },
   ],
   whenToUse: 'Run through the ultra-implement skill with the parent issue as args',
 };
@@ -82,6 +83,15 @@ const FINISH_SCHEMA = {
     reason: { type: 'string' },
     stage: { type: 'string' },
     status: { enum: ['ready', 'needs_person', 'failed'] },
+  },
+  required: ['status'],
+  type: 'object',
+};
+
+const ADDRESS_SCHEMA = {
+  properties: {
+    reason: { type: 'string' },
+    status: { enum: ['addressed', 'failed'] },
   },
   required: ['status'],
   type: 'object',
@@ -209,6 +219,15 @@ Move the sub-issue to the in-review stage only when all of this passes, then rea
 Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse). Leave the sub-issue in progress, and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }
 
+function addressPrompt(s, impl) {
+  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+${WORKTREE}
+git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
+1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with a timeout of at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply.
+3. After the last push, wait for the checks again the same way. Return addressed when they pass and no comment is open. Leave the sub-issue in its current stage. Return failed, with the reason, for anything that stays open.`;
+}
+
 const runs = new Map();
 
 function run(s) {
@@ -260,7 +279,18 @@ function run(s) {
         reason: 'The finish agent stopped',
         status: 'failed',
       };
-    return { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
+    const done = { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
+    if (finish.status === 'failed') return done;
+
+    const address = await agent(addressPrompt(s, impl), {
+      isolation: 'worktree',
+      label: `address:${s.id}`,
+      phase: 'Address',
+      schema: ADDRESS_SCHEMA,
+    });
+    if (!address) return { ...done, reason: 'The address agent stopped', status: 'failed' };
+    if (address.status === 'failed') return { ...done, reason: address.reason, status: 'failed' };
+    return done;
   })();
   runs.set(s.id, result);
   return result;
