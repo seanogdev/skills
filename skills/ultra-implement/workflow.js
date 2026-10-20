@@ -118,7 +118,7 @@ const ADDRESS_SCHEMA = {
 const LENSES = [
   {
     focus:
-      'Logic bugs, regressions, security holes, type gaps, missing or weak tests, and breaks of the conventions in the project instructions.',
+      'Logic bugs, regressions, security holes, type gaps, missing or weak tests, and breaks of the conventions in the project instructions, including the instructions in the folders of the changed files.',
     key: 'correctness',
   },
   {
@@ -228,7 +228,7 @@ ${WORKTREE}
 
 1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
 2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
-3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
+3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. This includes the project instructions in each folder that you change, such as AGENTS.md or CLAUDE.md files nested in those folders. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
 4. ${TESTING}
 5. Commit in small logical steps and push.
 6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
