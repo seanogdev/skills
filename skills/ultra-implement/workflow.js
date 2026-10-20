@@ -26,6 +26,7 @@ const PLAN_SCHEMA = {
       required: ['mode', 'reason'],
       type: 'object',
     },
+    preserve: { type: 'boolean' },
     subIssues: {
       items: {
         properties: {
@@ -42,7 +43,7 @@ const PLAN_SCHEMA = {
       type: 'array',
     },
   },
-  required: ['defaultBranch', 'delivery', 'subIssues'],
+  required: ['defaultBranch', 'delivery', 'preserve', 'subIssues'],
   type: 'object',
 };
 
@@ -115,6 +116,25 @@ const ADDRESS_SCHEMA = {
   type: 'object',
 };
 
+const PRESERVE_SCHEMA = {
+  properties: {
+    differences: {
+      items: {
+        properties: {
+          difference: { type: 'string' },
+          prUrl: { type: 'string' },
+          screen: { type: 'string' },
+        },
+        required: ['difference', 'screen'],
+        type: 'object',
+      },
+      type: 'array',
+    },
+  },
+  required: ['differences'],
+  type: 'object',
+};
+
 const LENSES = [
   {
     focus:
@@ -146,6 +166,7 @@ The parent's description is the spec for every sub-issue. Do not change anything
 Return:
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
 - subIssues: each sub-issue that is not done, with its id, title and url. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
+- preserve: true when the spec is a refactor or a migration, that is, it says that existing screens or callers must look and behave as before. Otherwise false.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
 - delivery: how the sub-issues reach the default branch, with the reason.
   - shared: each sub-issue PR goes into one shared branch, and one PR takes that branch to the default branch. Pick it when the spec or the project instructions ask for one branch or one PR, or when a sub-issue alone leaves the default branch in a state that must not ship, such as a half-built feature with no flag, or a consumer that breaks until a later sub-issue lands. Give branch a short name for the whole change. A branch of that name that is already on the remote is the shared branch.
@@ -186,7 +207,10 @@ const BROWSER_SETUP =
   preflight && preflight.browser === 'ready'
     ? `\nBrowser setup, checked at the start of this run:\n${preflight.notes}`
     : '';
-const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.${BROWSER_SETUP}`;
+const PRESERVE = plan.preserve
+  ? ` The spec is a refactor or a migration, so take the before screenshots from origin/${plan.defaultBranch}, not from the PR base. Compare before and after for each existing screen that renders a changed part. Fix each difference that the spec does not name.`
+  : '';
+const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.${PRESERVE}${BROWSER_SETUP}`;
 
 const { subIssues } = plan;
 const byId = new Map(subIssues.map((s) => [s.id, s]));
@@ -333,4 +357,21 @@ function run(s) {
 }
 
 const results = await Promise.all(subIssues.map(run));
-return { delivery: plan.delivery, parent, results, sharedBranch: shared || undefined };
+
+let preserveCheck;
+if (plan.preserve && preflight && preflight.browser === 'ready') {
+  const branches = results
+    .filter((r) => (r.status === 'ready' || r.status === 'needs_person') && r.branch)
+    .map((r) => `${r.branch} (${r.prUrl})`);
+  if (branches.length > 0) {
+    preserveCheck = await agent(
+      `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before. ${TRACKER}
+${WORKTREE}
+git fetch, then create a local branch from origin/${plan.defaultBranch} and merge each of these PR branches into it as origin/<branch>. Never push that merge. Resolve a conflict in the way that keeps both changes.
+${branches.join('\n')}
+Compare each screen that the run touched with origin/${plan.defaultBranch} in a browser: start the app once from the merge and once from origin/${plan.defaultBranch}. Return each difference that the spec does not name, with the PR that it comes from, in differences. Return an empty list when there is none.${BROWSER_SETUP}`,
+      { isolation: 'worktree', label: 'preserve-check', phase: 'Finish', schema: PRESERVE_SCHEMA },
+    );
+  }
+}
+return { delivery: plan.delivery, parent, preserveCheck, results, sharedBranch: shared || undefined };
