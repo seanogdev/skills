@@ -241,14 +241,14 @@ function reviewPrompt(s, impl, base, lens) {
   return `Review PR ${impl.prUrl} for sub-issue ${label(s)}. ${TRACKER}
 git fetch, then read the change with git diff origin/${base}...origin/${impl.branch}, and any file at the branch with git show origin/${impl.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
 Report only the ${lens.key} problems: ${lens.focus}
-Read only. Behaviour that the parent spec or the sub-issue asks for is the target, even when it changes what existing callers see. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
+Read only. Behaviour that the parent spec or the sub-issue asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
 }
 
 function finishPrompt(s, impl, findings) {
   return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
 ${WORKTREE}
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
-${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
+${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
 Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
 Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage.
@@ -260,7 +260,7 @@ function addressPrompt(s, impl) {
 ${WORKTREE}
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with a timeout of at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
-2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply.
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
 3. After the last push, wait for the checks again the same way. Return addressed when they pass and no comment is open. Leave the sub-issue in its current stage. Return failed, with the reason, for anything that stays open.`;
 }
 
