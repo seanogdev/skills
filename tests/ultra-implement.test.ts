@@ -62,7 +62,8 @@ async function runWorkflow(
   async function agent(prompt: string, opts: { label: string }) {
     calls.push({ label: opts.label, prompt });
     await Promise.resolve();
-    if (opts.label === 'plan') return { defaultBranch: 'main', subIssues };
+    if (opts.label === 'plan')
+      return { defaultBranch: 'main', delivery: { mode: 'separate', reason: 'test' }, preserve: false, subIssues };
     if (opts.label === 'preflight') return options.preflight ?? { browser: 'ready', notes: 'PREFLIGHT NOTES' };
     const reply = options.reply?.(opts.label);
     return reply === undefined ? defaultReply(opts.label) : reply;
@@ -99,10 +100,13 @@ test('runs a chain in order and stacks each branch on its predecessor', async ()
     'preflight',
     'implement:A',
     'finish:A',
+    'address:A',
     'implement:B',
     'finish:B',
+    'address:B',
     'implement:C',
     'finish:C',
+    'address:C',
   ]);
   assert.match(promptFor(run, 'implement:A'), /origin\/main/u);
   assert.match(promptFor(run, 'implement:B'), /--base branch-A/u);
