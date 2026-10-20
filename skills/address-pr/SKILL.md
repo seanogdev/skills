@@ -71,7 +71,7 @@ Item:
 Each subagent returns an outcome, a commit, evidence, a one-line change, and notes. Weigh each return before you act on it:
 
 - Read the evidence line yourself before you accept a decline of a comment the user voted up.
-- Read the evidence line of a Fixed return when this PR changed the flagged line. The fix must keep the purpose of that change.
+- Read the evidence line of a return with a commit (Fixed, Partially accepted or Worked around) when this PR changed the flagged line. The fix must keep the purpose of that change.
 - If a return does not hold up, send the same subagent back with what is wrong, rather than a fresh one.
 - An Asked outcome on local feedback is a question for the user. Ask it.
 - An Asked return that stopped on a hook failure: if the cause is the worktree setup, for example a missing install, fix it and send the subagent back. Otherwise show the user the hook output and ask.
