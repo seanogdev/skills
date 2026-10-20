@@ -74,6 +74,7 @@ fragment c on Reactable {
   + (.data.repository.pullRequest
   | .baseRefName as $base
   | {prId: .id,
+     base: $base,
      mergeable,
      threads: [.reviewThreads.nodes[]
                # Unresolved, plus any thread this account replied in that
@@ -102,7 +103,7 @@ fragment c on Reactable {
                        runId: .checkSuite.workflowRun.databaseId,
                        jobId: (if .checkSuite.workflowRun == null then null else .databaseId end)}
                  else {name: .context, state, url: .targetUrl} end] as $checks
-              | {sha: $head.oid, base: $base, state,
+              | {sha: $head.oid, state,
                  failing: [$checks[] | select(.state | IN("SUCCESS", "SKIPPED", "NEUTRAL", "PENDING", "EXPECTED") | not)],
                  pending: [$checks[] | select(.state | IN("PENDING", "EXPECTED"))]}
             end)})`;

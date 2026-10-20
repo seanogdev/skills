@@ -56,12 +56,12 @@ Work one item of PR feedback. Read SKILL_DIR/references/item.md first and follow
 
 Checkout: <full path of this item's worktree>
 Reply file: <full path, one per item>
+PR: <`pr` and `base` from fetch.ts, or "none" and the default branch>
 Item:
 <a comment: url, author, isBot, path:line, isOutdated, whether it came back
- from an earlier pass, the user's vote, base branch (`ci.base`), and every
- comment in the thread>
-<a check: name, url, workflow, runId, jobId, head sha, base branch (`ci.base`), and
- whether it was already rerun>
+ from an earlier pass, the user's vote, and every comment in the thread>
+<a check: name, url, workflow, runId, jobId, head sha, and whether it was
+ already rerun>
 <anything the user said about this item>
 ```
 
