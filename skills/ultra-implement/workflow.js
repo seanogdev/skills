@@ -118,7 +118,7 @@ const ADDRESS_SCHEMA = {
 const LENSES = [
   {
     focus:
-      'Logic bugs, regressions, security holes, type gaps, missing or weak tests, and breaks of the conventions in the project instructions, including the instructions in the folders of the changed files.',
+      'Logic bugs, regressions, security holes, type gaps, missing or weak tests, tests that only restate the code, and breaks of the conventions in the project instructions, including the instructions in the folders of the changed files.',
     key: 'correctness',
   },
   {
