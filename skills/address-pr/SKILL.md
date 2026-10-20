@@ -44,8 +44,11 @@ Hand each item to its own subagent and start them all in one turn, so they run i
 Parallel subagents cannot share one checkout, so give each its own. Pick the PR branch checkout first: if `git worktree list` shows a checkout of the PR branch, use that one. Then, from it, make one worktree per item on a scratch branch at the current head, all in one command:
 
 ```bash
+git fetch origin BASE
 git worktree add -b address-pr/ITEM_N ../WORKTREE_DIR_N HEAD
 ```
+
+The fetch keeps `origin/BASE..HEAD` to the commits of this PR after the base moved. Run it once, before the worktrees, so the subagents do not race on the ref.
 
 A fresh worktree has no installed dependencies, so its commit hooks and checks fail. In the same command, install them in each worktree with the repo's lockfile install, for example `pnpm install --frozen-lockfile --prefer-offline`. Each subagent then commits through the hooks.
 
