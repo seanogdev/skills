@@ -74,6 +74,7 @@ Each subagent returns an outcome, a commit, evidence, a one-line change, and not
 - Read the evidence line of a Fixed return when this PR changed the flagged line. The fix must keep the purpose of that change.
 - If a return does not hold up, send the same subagent back with what is wrong, rather than a fresh one.
 - An Asked outcome on local feedback is a question for the user. Ask it.
+- An Asked return that stopped on a hook failure: if the cause is the worktree setup, for example a missing install, fix it and send the subagent back. Otherwise show the user the hook output and ask.
 - Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
 
 Once every subagent has returned, bring the commits onto the PR branch. In the PR branch checkout, cherry-pick each item's commit in query order with `git cherry-pick`. Where one conflicts, resolve it if the fix is plain. Otherwise abort the pick and send that subagent back with the conflict, in a fresh worktree off the new head. A cherry-pick makes a new sha. So read each item's sha back from the PR branch with `git log`, and replace the `SHORT_SHA` and `FULL_SHA` placeholders in its reply file. Then remove the worktrees and scratch branches: `git worktree remove --force PATH` and `git branch -D address-pr/ITEM_N`.
