@@ -12,7 +12,7 @@ Check the claim before you act on it. Read the surrounding file, not only the di
 
 The comment was written against some commit, and the branch has probably moved since. Check the file as it stands now, not the snippet quoted in the comment and not the diff hunk it was raised against. A later commit can fix what the comment describes, move the line it points at, or change the code around it. If the line number or the quoted code no longer matches the file, that gap is itself a sign the code moved on. The current version decides the call.
 
-When this PR changed the flagged line, find the purpose of that change before you fix it. Read the commit that made it (`git log -L LINE,LINE:FILE origin/BASE..HEAD`) and, if there is a PR, the part of its body that names it (`gh pr view PR --json body`). The change was often the fix of a different problem. Your fix must keep that purpose. Check each case that the change was for, not only the case that the reviewer names.
+When this PR changed the flagged line, find the purpose of that change before you fix it. Read the commit that made it (`git log -L LINE,LINE:FILE origin/BASE..HEAD`) and, if there is a PR, the part of its body that names it (`gh pr view PR --json body`). Take `LINE` from the file in HEAD, not from the comment's `path:line`: on an outdated thread that number is stale or null. The change was often the fix of a different problem. Your fix must keep that purpose. Check each case that the change was for, not only the case that the reviewer names.
 
 Fix it if the claim holds up. Fix it also if the reviewer points at a real risk, even where you would pick a different fix. Say so if it does not hold up. Decline it in these cases:
 
