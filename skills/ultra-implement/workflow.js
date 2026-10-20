@@ -17,6 +17,15 @@ if (!parent) throw new Error('Pass the parent issue link or reference as args');
 const PLAN_SCHEMA = {
   properties: {
     defaultBranch: { type: 'string' },
+    delivery: {
+      properties: {
+        branch: { type: 'string' },
+        mode: { enum: ['separate', 'shared'] },
+        reason: { type: 'string' },
+      },
+      required: ['mode', 'reason'],
+      type: 'object',
+    },
     subIssues: {
       items: {
         properties: {
@@ -33,7 +42,16 @@ const PLAN_SCHEMA = {
       type: 'array',
     },
   },
-  required: ['defaultBranch', 'subIssues'],
+  required: ['defaultBranch', 'delivery', 'subIssues'],
+  type: 'object',
+};
+
+const BRANCH_SCHEMA = {
+  properties: {
+    reason: { type: 'string' },
+    status: { enum: ['ready', 'blocked'] },
+  },
+  required: ['status'],
   type: 'object',
 };
 
@@ -128,7 +146,10 @@ The parent's description is the spec for every sub-issue. Do not change anything
 Return:
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
 - subIssues: each sub-issue that is not done, with its id, title and url. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
-- skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.`,
+- skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
+- delivery: how the sub-issues reach the default branch, with the reason.
+  - shared: each sub-issue PR goes into one shared branch, and one PR takes that branch to the default branch. Pick it when the spec or the project instructions ask for one branch or one PR, or when a sub-issue alone leaves the default branch in a state that must not ship, such as a half-built feature with no flag, or a consumer that breaks until a later sub-issue lands. Give branch a short name for the whole change. A branch of that name that is already on the remote is the shared branch.
+  - separate: each sub-issue PR goes to the default branch, or to the branch of its predecessor. Pick it when each sub-issue can ship alone.`,
     { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
   ),
   agent(
@@ -145,6 +166,21 @@ if (preflight && preflight.browser === 'blocked') {
   log(`Browser preflight blocked: ${preflight.reason}`);
   return { parent, preflight, results: [] };
 }
+
+const shared = plan.delivery.mode === 'shared' && plan.delivery.branch;
+if (shared) {
+  const branch = await agent(
+    `Make sure the branch ${shared} is on the remote. git fetch. If origin/${shared} exists, use it as it is. Otherwise run git push origin origin/${plan.defaultBranch}:refs/heads/${shared}. Change nothing else. You run in the user's own checkout, so leave its branch and working tree as they are. Return ready when origin/${shared} exists, or blocked with the reason.`,
+    { label: 'shared-branch', phase: 'Plan', schema: BRANCH_SCHEMA },
+  );
+  if (!branch || branch.status !== 'ready') {
+    const reason = (branch && branch.reason) || 'The shared-branch agent stopped';
+    log(`Shared branch blocked: ${reason}`);
+    return { delivery: plan.delivery, parent, results: [], sharedBranch: { reason, status: 'blocked' } };
+  }
+}
+const root = shared || plan.defaultBranch;
+log(`Delivery: ${plan.delivery.mode}${shared ? ` into ${shared}` : ''}. ${plan.delivery.reason}`);
 
 const BROWSER_SETUP =
   preflight && preflight.browser === 'ready'
@@ -184,7 +220,7 @@ function label(s) {
 }
 
 function implementPrompt(s, bases) {
-  const base = bases[0] || plan.defaultBranch;
+  const base = bases[0] || root;
   const merges = bases.slice(1);
   return `${TRACKER}
 Implement sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}. The parent's description is the spec. State the sub-issue title before you start.
@@ -195,7 +231,7 @@ ${WORKTREE}
 3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
 4. ${TESTING}
 5. Commit in small logical steps and push.
-6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.
+6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
 7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The finish step moves it after the review.
 
 If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
@@ -243,7 +279,7 @@ function run(s) {
     }
 
     const bases = before.map((r) => r.branch);
-    const base = bases[0] || plan.defaultBranch;
+    const base = bases[0] || root;
     const impl = await agent(implementPrompt(s, bases), {
       isolation: 'worktree',
       label: `implement:${s.id}`,
@@ -297,4 +333,4 @@ function run(s) {
 }
 
 const results = await Promise.all(subIssues.map(run));
-return { parent, results };
+return { delivery: plan.delivery, parent, results, sharedBranch: shared || undefined };
