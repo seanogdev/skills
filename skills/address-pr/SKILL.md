@@ -5,112 +5,84 @@ license: MIT
 argument-hint: '[PR number, url or branch, or a path to a review file]'
 ---
 
-Take a PR to a conclusion. Fix each item of live feedback, or push back on it. Fix each failing CI check, or trace it to a cause outside the branch. Then account for the whole pass to the user. On a PR, also reply to each comment either way, vote on it, and resolve the thread.
+# Address PR
 
-## Where the feedback is
+## Source
 
-**A PR.** The default. If no PR was named, use the open PR for the current branch.
+- **In session** — the findings are already in the context: a review report, comments the user pasted, or a file the user points at. Skip **Fetch** and **Reply**.
+- **GitHub PR** — the feedback is on a PR. Do every section.
 
-**Local.** A review that sits in this conversation: a `/code-review` report, a pasted set of comments, or the user listing what they want changed. A file the user points at is local too. The items are worked the same way.
+Use GitHub mode whenever the findings are on a PR, even if this session also produced them.
 
-`$ARGUMENTS` holds what the user typed after the skill name. It is empty when they gave nothing.
+## Fetch
 
-Route the invocation like this:
-
-- A path or an `@file` in the invocation means the file.
-- The user pointing at feedback already in the conversation ("address that", "fix those", "work through the review above") with no PR named means the conversation.
-- Otherwise it is the PR.
-- If the user names both, read both. Run each under its own rules. Then give one summary that covers the lot.
-
-Then read the file for that mode before you do anything else. Each path in this skill is relative to the directory that holds this file. Expand it to a full path before you use it.
-
-- A PR: `references/github.md`.
-- Local: `references/local.md`.
-
-The mode file holds the rules this file does not repeat.
-
-If the branch has an open PR, CI is part of the pass in either mode. Read `references/ci.md` too. A PR with no CI is not a failing PR.
-
-## Conflicts with the base
-
-If the branch has an open PR, read `mergeable` from `node scripts/fetch.ts` in either mode. `CONFLICTING` means you resolve the conflicts before you make any worktree, so each item starts from the updated head. Invoke the `resolve-conflicts` skill on the PR branch and let it push. If that skill is not installed, merge the base into the PR branch, resolve each conflict so that both sides keep their intent, run the project's checks, and push. Then run `fetch.ts` again, because the push replaced the head that `ci` describes. `UNKNOWN` means GitHub has not computed it yet: read again after a short wait. A local pass that will not push resolves nothing: the summary names the conflict.
-
-## Working the items
-
-Split the feedback into items, one per distinct point. Each failing check is an item too. Where two items raise the same issue, make them one item, so one commit fixes both. A thread that came back only to accept the last answer or say thanks is not an item: it gets an Acknowledged row in the summary and nothing else.
-
-Hand each item to its own subagent and start them all in one turn, so they run in parallel. The subagent checks the claim, makes the fix, commits, and drafts the reply. Its file reads, edits and test output stay in its own context, so yours stays small across a long pass. Run it one tier below your own model. In Claude Code, that is `model: "sonnet"` on the Agent call. In another harness, pick its mid-tier model, or leave the default where the harness offers no choice. You keep the judgment on its return.
-
-Parallel subagents cannot share one checkout, so give each its own. Pick the PR branch checkout first: if `git worktree list` shows a checkout of the PR branch, use that one. Then, from it, make one worktree per item on a scratch branch at the current head, all in one command:
+`scripts/fetch.ts` sits in the directory that holds this file. Expand it to a full path before you run it.
 
 ```bash
-git fetch origin BASE
-git worktree add -b address-pr/ITEM_N ../WORKTREE_DIR_N HEAD
+node scripts/fetch.ts [PR]   # defaults to the current branch's PR
 ```
 
-The fetch keeps `origin/BASE..HEAD` to the commits of this PR after the base moved. Run it once, before the worktrees, so the subagents do not race on the ref.
+Returns unresolved inline threads, review bodies and conversation comments. Run it at the start of every pass; earlier reads are stale. Skip bot CI and coverage noise. Hide a bot comment that only tallies its inline findings ("🚨 1 blocking, 4 non-blocking") right away:
 
-A fresh worktree has no installed dependencies, so its commit hooks and checks fail. In the same command, install them in each worktree with the repo's lockfile install, for example `pnpm install --frozen-lockfile --prefer-offline`. Each subagent then commits through the hooks.
-
-Send each subagent this prompt, filled in. Expand `SKILL_DIR` to the full path of the directory that holds this file.
-
-```
-Work one item of PR feedback. Read SKILL_DIR/references/item.md first and follow it.
-
-Checkout: <full path of this item's worktree>
-Reply file: <full path, one per item>
-PR: <`pr` and `base` from fetch.ts, or "none" and the default branch>
-Item:
-<a comment: url, author, isBot, path:line, isOutdated, whether it came back
- from an earlier pass, the user's vote, and every comment in the thread>
-<a check: name, url, workflow, runId, jobId, head sha, and whether it was
- already rerun>
-<anything the user said about this item>
+```bash
+gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id=COMMENT_ID
 ```
 
-Each subagent returns an outcome, a commit, evidence, a one-line change, and notes. Weigh each return before you act on it:
+When `commentCount` is more than the comments you got, the middle of that thread is missing; read it on the PR before you reply.
 
-- Read the evidence line yourself before you accept a decline of a comment the user voted up.
-- Read the evidence line of a return with a commit (Fixed, Partially accepted or Worked around) when this PR changed the flagged line. The fix must keep the purpose of that change.
-- If a return does not hold up, send the same subagent back with what is wrong, rather than a fresh one.
-- An Asked outcome on local feedback is a question for the user. Ask it.
-- An Asked return that stopped on a hook failure: if the cause is the worktree setup, for example a missing install, fix it and send the subagent back. Otherwise show the user the hook output and ask.
-- Where the subagent ran a rerun, the wait in `references/ci.md` covers it.
+In a thread the first comment is the feedback and the rest is the discussion so far. A review body or conversation comment has no thread: a `me` comment that links to it is its discussion. A vote (`userVotes`) from `me`, or a non-`isBot` `me` comment, is the author's position; an `isBot` `me` comment is feedback to act on. Don't reply again to a thread whose last comment is a non-`isBot` `me` comment unless it asks something new; if that reply reported a fix, the resolve did not land, so resolve it now.
 
-Once every subagent has returned, bring the commits onto the PR branch. In the PR branch checkout, cherry-pick each item's commit in query order with `git cherry-pick`. Where one conflicts, resolve it if the fix is plain. Otherwise abort the pick and send that subagent back with the conflict, in a fresh worktree off the new head. A cherry-pick makes a new sha. So read each item's sha back from the PR branch with `git log`, and replace the `SHORT_SHA` and `FULL_SHA` placeholders in its reply file. Then remove the worktrees and scratch branches: `git worktree remove --force PATH` and `git branch -D address-pr/ITEM_N`.
+## Conflicts
 
-Batch your own calls: independent reads in one call, and the push with the `git log` that reads the shas back.
+GitHub mode. If `mergeable` is `CONFLICTING`, merge `base` (from `fetch.ts`) into the branch first (not a rebase, which breaks the commit links in earlier replies), keep both sides' intent in each conflict, and push. `UNKNOWN` means GitHub is still computing it. In both cases run `fetch.ts` again.
 
-Push to the PR branch once, after the last item and **before** any reply goes out. Each reply must point at code that is already on the PR. A local pass pushes nothing, unless the user named the PR or asked to push or post, as `references/local.md` says.
+## Decide
 
-## Finishing
+Check each claim against the file as it stands now, not the diff hunk or the snippet quoted in the comment. Fix it when it holds up. When it names a real risk but its suggested fix is wrong, fix the risk the correct way and say how your fix differs. Decline when it misreads the code, is already handled, or would break something outside the diff. Ask when it's ambiguous. Out of scope when it's right but doesn't belong in this change; propose a follow-up task in the summary rather than creating one. For `isOutdated` threads, confirm the concern still applies.
 
-**Re-read the feedback.** Run `node scripts/fetch.ts` again, or read the local file again: a reviewer may have commented during the pass, and the user may have changed the ask since. Anything new becomes an item. `mergeable: CONFLICTING` means the base moved during the pass: resolve it as **Conflicts with the base** says. A thread that comes back unresolved with your own reply last is one where the vote or the resolve did not land: cast and resolve it now. Then wait for CI on the final head as `references/ci.md` says. Move on once a fresh read has nothing left to act on and no check on the head fails or is still running.
+Every finding gets an outcome. A 👍, 👎 or reply from `me` in the thread settles the close calls; when it disagrees with what the code shows, follow the code and say so in the summary.
 
-**Bring the PR description up to date**, once, wherever this pass pushed to an open PR. If the fixes made a claim in the body false, or changed what the branch does, edit only the sentences that no longer hold. Add a sentence where the branch now does something the body does not say. Post the result with `gh pr edit --body-file`. That replaces the whole body, so copy every other line unchanged: each template heading, each checkbox and its state, each image, video and `user-attachments` link with its caption, and each issue or PR reference. Add no new section, and do not rewrite text that is still true. Remove a claim that no longer holds, and put no revision history or note in its place. If the fixes changed nothing the body states or should state, leave it.
+Some calls are the author's, not yours: which of two valid fixes to take, whether flagged behaviour was deliberate, whether a decline is one they'll defend under their name. In GitHub mode, when the thread and the code don't answer them, put those to the user in one batched question at the end of this step so nothing is fixed or posted before they answer, each option a concrete outcome — "fix as suggested", "decline: already handled at line 24", "follow-up task". This isn't the `Asked` outcome, which is a question posted to the reviewer.
 
-## Summary
+In session, act and report the outcome instead of asking.
 
-The summary goes to the user, last, once every fix is pushed and every thread is settled. Lead with a table, one row per item, in query order:
+## Apply
 
-| Comment                       | Outcome            | Change                                                                      |
-| ----------------------------- | ------------------ | --------------------------------------------------------------------------- |
-| [`useFoo.ts:24`](COMMENT_URL) | Fixed              | Moved the normalisation into the transformer (`a1b2c3d`)                    |
-| [`Bar.vue:88`](COMMENT_URL)   | Declined           | The null guard on line 24 already covers it                                 |
-| [`Qux.ts:40`](COMMENT_URL)    | Partially accepted | Renamed the prop (`b2c3d4e`). The default stays, because the parent sets it |
-| [`Baz.ts:12`](COMMENT_URL)    | Out of scope       | Tracked in #418                                                             |
+Fix the cause, not the symptom: suppressing a warning, skipping a test, loosening an assertion, editing a workflow or special-casing the reviewer's input is not a fix. Fix in small commits.
 
-- **Comment**: linked to the item's `url`. A local item has no url, so label it `path:line`. Mark a row that is not inline `review body` or `conversation`. Failing checks come after the feedback, as `CI: <check name>` linked to the check's `url`.
-- **Outcome**: one of Fixed, Partially accepted, Worked around, Declined, Out of scope, Asked, Outdated, Acknowledged, Rerun (a flaky check that passed when it ran again), Pending (a check that did not finish).
-- **Change**: the subagent's one-line change, with the sha of every fix.
+## Reply
 
-Under the table, add only what a row cannot carry:
+GitHub mode. Push the fixes before you post.
 
-- Every comment the user voted up, or said they wanted, that was declined anyway, with the reason. This one goes first.
-- Every thread that came back from an earlier pass, and whether the reviewer's answer moved the call.
-- Anything resolved on thin reasoning. A resolved thread is easy for the reviewer to scroll past.
-- Every point worked around rather than fixed, and what the real fix is.
-- Any thread left open, and any automated comment left unvoted.
-- Any check that still fails on the head, and why.
-- Each conflict resolution with the base, with the report that `resolve-conflicts` gave.
-- Anything that needs the user's call.
+1. Write each reply to a file; never pass a body inline on the shell. Read shas, line numbers and issue numbers from their source right before use. Link shas as `[a1b2c3d](https://github.com/REPO/commit/FULL_SHA)` via `git log -1 --format='%h %H'`.
+2. Post:
+   - Inline thread: `gh api repos/REPO/pulls/N/comments/<comments[0].databaseId>/replies -F body=@FILE`
+   - Review body or conversation comment: `gh pr comment N --body-file FILE`, opening with a link to what it answers: `Re [short label](url)`.
+3. Vote on the feedback (`comments[0].id` of a thread, or the `id` of a review body or conversation comment) unless `userVotes` already holds one. `THUMBS_UP` when it should be addressed: fixed, or agreed but out of scope. `THUMBS_DOWN` when declined, but only on an automated comment (`isBot`); a human's decline is carried by the reply alone. No vote when asked or outdated.
+   `gh api graphql -f query='mutation($id:ID!,$c:ReactionContent!){addReaction(input:{subjectId:$id,content:$c}){reaction{content}}}' -f id=ID -f c=THUMBS_UP`
+4. Resolve fixed and outdated threads, and hide fixed and outdated conversation comments with the minimize command from **Fetch**. Declined and asked ones stay open for the reviewer; out-of-scope ones stay open until a follow-up link is in the thread.
+   `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=THREAD_ID`
+
+Replies are one or two sentences, outcome first. Fixed: what changed plus the linked sha, and the reason when the fix is not the one suggested. Declined: the line or symbol that answers the comment. Out of scope: agree and say it goes to a follow-up. No openers like "Great point" or "You're right", and no recap of their comment.
+
+## CI
+
+GitHub mode, when `checks` is true — after any fixes are pushed, or right away if there were none. Wait for the checks on the head with `gh pr checks N --watch --interval 30` in the background. Restart it if it stops early, including the "no checks reported" exit it gives for a few seconds after a push, but at most twice; if it still reports nothing the head has no checks, so report the check as Pending and move on. For each failing check, read `gh run view --job JOB_ID --log-failed` and find the first error, not the last line. Fix the cause and push. Out of scope when the base branch fails the same way (`gh run list --branch <base> --workflow NAME --limit 5`). If the error names infrastructure, not code, rerun once with `gh run rerun RUN_ID --failed`; a second failure is the branch's.
+
+## Finish
+
+In GitHub mode, run `fetch.ts` again and loop on anything new.
+
+If there is a PR, compare its description with `git diff <base>...HEAD` and update it where the branch no longer matches; no revision history, no "no longer applies" notes.
+
+Then summarise to the user, one row per item, linked to its `url`:
+
+| Comment                            | Outcome      | Vote | Change                                               |
+| ---------------------------------- | ------------ | ---- | ---------------------------------------------------- |
+| [`useFoo.ts:24`](URL)              | Fixed        | 👍   | Moved normalisation into the transformer (`a1b2c3d`) |
+| [`Bar.vue:88`](URL)                | Declined     |      | The null guard on line 24 already covers it          |
+| [review body: error handling](URL) | Out of scope | 👍   | Proposed as a follow-up task below                   |
+
+Outcomes: Fixed, Declined, Out of scope, Asked, Outdated. `Asked` and `Outdated` are GitHub only. A failing check is a `CI: <name>` row linked to its url, with outcome Fixed, Rerun, Out of scope or Pending. Below the table, list only what the user should know: where you went against a vote or reply of theirs, and what needs their call.
+
+In session, drop the `url` link and the Vote column, and name each finding by its `file:line` and its severity/category tag.
