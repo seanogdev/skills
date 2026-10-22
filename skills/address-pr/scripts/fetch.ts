@@ -1,11 +1,116 @@
 #!/usr/bin/env node
-// Read every piece of feedback on a PR: inline threads, review bodies, conversation, the CI checks on its head commit, and whether it conflicts with its base.
+// Read the unresolved inline threads, review bodies and unhidden conversation comments on a PR,
+// and whether it conflicts with its base (mergeable: MERGEABLE, CONFLICTING or UNKNOWN).
+// base: the branch the PR merges into. checks: whether CI has reported on the PR yet.
+// userVotes: 👍/👎 already on the feedback from this account. isBot: a GitHub App author.
 // Usage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)
 
-import { die as dieBase, DieError, errText, gh, gql } from './lib.ts';
+import { die as dieBase, DieError, errText, gh } from './lib.ts';
 
 function die(msg: string): never {
   return dieBase('fetch.ts', msg);
+}
+
+interface Author {
+  login: string;
+  // eslint-disable-next-line no-underscore-dangle -- GraphQL's field name
+  __typename: string;
+}
+
+interface Reacted {
+  viewerHasReacted: boolean;
+}
+
+interface Voteable {
+  id: string;
+  url: string;
+  body: string;
+  author: Author | null;
+  up: Reacted;
+  down: Reacted;
+}
+
+interface ThreadComment extends Voteable {
+  databaseId: number;
+}
+
+interface Page {
+  hasPreviousPage: boolean;
+}
+
+interface Response {
+  data: {
+    viewer: { login: string };
+    repository: {
+      nameWithOwner: string;
+      pullRequest: {
+        number: number;
+        url: string;
+        mergeable: string;
+        baseRefName: string;
+        commits: { nodes: { commit: { statusCheckRollup: unknown } }[] };
+        reviewThreads: {
+          pageInfo: Page;
+          nodes: ({
+            id: string;
+            isResolved: boolean;
+            isOutdated: boolean;
+            path: string;
+            line: number | null;
+            comments: { totalCount: number; nodes: ThreadComment[] };
+            tail: { nodes: ThreadComment[] };
+          } | null)[];
+        };
+        reviews: { pageInfo: Page; nodes: Voteable[] };
+        comments: { pageInfo: Page; nodes: (Voteable & { isMinimized: boolean })[] };
+      };
+    };
+  };
+}
+
+const QUERY = `
+fragment C on PullRequestReviewComment {
+  id databaseId url body
+  author { login __typename }
+  up: reactions(content:THUMBS_UP) { viewerHasReacted }
+  down: reactions(content:THUMBS_DOWN) { viewerHasReacted }
+}
+query($owner:String!, $repo:String!, $number:Int!) {
+  viewer { login }
+  repository(owner:$owner, name:$repo) {
+    nameWithOwner
+    pullRequest(number:$number) {
+      number url mergeable baseRefName
+      commits(last:10) { nodes { commit { statusCheckRollup { state } } } }
+      reviewThreads(last:100) {
+        pageInfo { hasPreviousPage }
+        nodes { id isResolved isOutdated path line
+                comments(first:20) { totalCount nodes { ...C } }
+                tail: comments(last:5) { nodes { ...C } } }
+      }
+      reviews(last:100) { pageInfo { hasPreviousPage }
+                          nodes { id url body author { login __typename }
+                                  up: reactions(content:THUMBS_UP) { viewerHasReacted }
+                                  down: reactions(content:THUMBS_DOWN) { viewerHasReacted } } }
+      comments(last:100) { pageInfo { hasPreviousPage }
+                           nodes { id url body isMinimized author { login __typename }
+                                   up: reactions(content:THUMBS_UP) { viewerHasReacted }
+                                   down: reactions(content:THUMBS_DOWN) { viewerHasReacted } } }
+    }
+  }
+}`;
+
+function votes(c: Voteable): string[] {
+  return [c.up.viewerHasReacted && 'THUMBS_UP', c.down.viewerHasReacted && 'THUMBS_DOWN'].filter(Boolean) as string[];
+}
+
+function isBot(c: Voteable): boolean {
+  // eslint-disable-next-line no-underscore-dangle -- GraphQL's field name
+  return c.author?.__typename === 'Bot';
+}
+
+function feedback(c: Voteable) {
+  return { author: c.author?.login, body: c.body, id: c.id, isBot: isBot(c), url: c.url, userVotes: votes(c) };
 }
 
 // die() throws; this is the one place that turns it into the process exit a
@@ -16,7 +121,7 @@ try {
   const arg = process.argv[2];
   if (arg === '-h' || arg === '--help') {
     console.log(
-      "Read every piece of feedback on a PR: inline threads, review bodies, conversation, the CI checks on its head commit, and whether it conflicts with its base.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
+      "Read the unresolved threads, review bodies and conversation comments on a PR, and whether it conflicts with its base.\nUsage: fetch.ts [PR]   (number, url or branch; defaults to the current branch's PR)",
     );
     process.exit(0);
   }
@@ -37,80 +142,67 @@ try {
   const [owner, repo, , number] = url.split('/').slice(3);
   if (!owner || !repo || !number) die(`cannot read owner/repo/number out of ${url}`);
 
-  // REST does not expose thread resolution state, so all three sources come over
-  // GraphQL in one read.
-  const query = `
-query($owner:String!, $repo:String!, $number:Int!) {
-  viewer { login }
-  repository(owner:$owner, name:$repo) {
-    pullRequest(number:$number) {
-      id
-      baseRefName
-      mergeable
-      reviewThreads(first:100) {
-        nodes { id isResolved isOutdated path line comments(first:50) { nodes { ...c } } }
-      }
-      reviews(first:50) { nodes { id url state author { login __typename } body ...r } }
-      comments(first:100) { nodes { ...c } }
-      commits(last:1) { nodes { commit { oid statusCheckRollup { state contexts(first:100) { nodes {
-        __typename
-        ... on CheckRun { name status conclusion detailsUrl databaseId
-                          checkSuite { workflowRun { databaseId workflow { name } } } }
-        ... on StatusContext { context state targetUrl }
-      } } } } } }
-    }
+  // REST does not expose thread resolution state, so all three sources come over GraphQL in one read.
+  const raw = await gh([
+    'api',
+    'graphql',
+    '-f',
+    `owner=${owner}`,
+    '-f',
+    `repo=${repo}`,
+    '-F',
+    `number=${number}`,
+    '-f',
+    `query=${QUERY}`,
+  ]);
+  const { data } = JSON.parse(raw) as Response;
+  const { viewer, repository } = data;
+  const pr = repository.pullRequest;
+
+  // Not paged: last:N keeps the newest, so a dropped item is older. Warn, don't fail.
+  if ([pr.reviewThreads, pr.reviews, pr.comments].some((c) => c.pageInfo.hasPreviousPage)) {
+    console.error('fetch.ts: warning: more reviews, threads or comments exist than were fetched; some may be missing');
   }
-}
-fragment r on Reactable { reactionGroups { content viewerHasReacted } }
-fragment c on Reactable {
-  id
-  reactionGroups { content viewerHasReacted }
-  ... on PullRequestReviewComment { url author { login __typename } body }
-  ... on IssueComment { url author { login __typename } body }
-}`;
 
-  const jq = `.data.viewer.login as $viewer
-  | {viewer: $viewer}
-  + (.data.repository.pullRequest
-  | .baseRefName as $base
-  | {prId: .id,
-     base: $base,
-     mergeable,
-     threads: [.reviewThreads.nodes[]
-               # Unresolved, plus any thread this account replied in that
-               # someone has spoken on since. GitHub leaves a thread
-               # resolved when a new comment lands, so a reviewer
-               # answering a closed thread is invisible without this.
-               | select(.isResolved == false
-                        or (any(.comments.nodes[1:][]; .author.login == $viewer)
-                            and (.comments.nodes | last | .author.login) != $viewer))
-               | {id, path, line, isOutdated, isResolved,
-                  comments: [.comments.nodes[] | {id, url, author: .author.login, isBot: (.author.__typename == "Bot"), body,
-                             userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}]}],
-     reviews: [.reviews.nodes[] | select(.body != "")
-               | {id, url, state, author: .author.login, isBot: (.author.__typename == "Bot"), body,
-                  userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}],
-     conversation: [.comments.nodes[] | {id, url, author: .author.login, isBot: (.author.__typename == "Bot"), body,
-                    userVotes: [.reactionGroups[] | select(.viewerHasReacted) | .content]}],
-     # null when no check has reported on the head commit: no CI, not a failure.
-     ci: (.commits.nodes[0].commit as $head
-          | $head.statusCheckRollup
-          | if . == null then null else
-              [.contexts.nodes[]
-               | if .__typename == "CheckRun"
-                 then {name, state: (.conclusion // "PENDING"), url: .detailsUrl,
-                       workflow: .checkSuite.workflowRun.workflow.name,
-                       runId: .checkSuite.workflowRun.databaseId,
-                       jobId: (if .checkSuite.workflowRun == null then null else .databaseId end)}
-                 else {name: .context, state, url: .targetUrl} end] as $checks
-              | {sha: $head.oid, state,
-                 failing: [$checks[] | select(.state | IN("SUCCESS", "SKIPPED", "NEUTRAL", "PENDING", "EXPECTED") | not)],
-                 pending: [$checks[] | select(.state | IN("PENDING", "EXPECTED"))]}
-            end)})`;
+  const threads = pr.reviewThreads.nodes.flatMap((t) => {
+    if (!t || t.isResolved) return [];
+    const seen = new Set<string>();
+    const comments = [...t.comments.nodes, ...t.tail.nodes].filter((c) => !seen.has(c.id) && seen.add(c.id));
+    const [first] = comments;
+    return [
+      {
+        commentCount: t.comments.totalCount,
+        comments: comments.map((c) => ({
+          author: c.author?.login,
+          body: c.body,
+          databaseId: c.databaseId,
+          id: c.id,
+          url: c.url,
+        })),
+        id: t.id,
+        isBot: isBot(first),
+        isOutdated: t.isOutdated,
+        line: t.line,
+        path: t.path,
+        userVotes: votes(first),
+      },
+    ];
+  });
 
-  const raw = await gql(query, ['-f', `owner=${owner}`, '-f', `repo=${repo}`, '-F', `number=${number}`], jq);
+  const out = {
+    base: pr.baseRefName,
+    checks: pr.commits.nodes.some((n) => n.commit.statusCheckRollup !== null),
+    conversation: pr.comments.nodes.filter((c) => !c.isMinimized).map((c) => feedback(c)),
+    me: viewer.login,
+    mergeable: pr.mergeable,
+    number: pr.number,
+    pr: pr.url,
+    repo: repository.nameWithOwner,
+    reviews: pr.reviews.nodes.filter((r) => r.body !== '').map((r) => feedback(r)),
+    threads,
+  };
 
-  console.log(JSON.stringify({ pr: url, ...JSON.parse(raw) }, undefined, 2));
+  console.log(JSON.stringify(out, undefined, 2));
 } catch (error) {
   if (!(error instanceof DieError)) throw error;
   console.error(error.message);
