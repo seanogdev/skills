@@ -57,6 +57,7 @@ interface Response {
             isOutdated: boolean;
             path: string;
             line: number | null;
+            originalLine: number | null;
             comments: { totalCount: number; nodes: ThreadComment[] };
             tail: { nodes: ThreadComment[] };
           } | null)[];
@@ -84,7 +85,7 @@ query($owner:String!, $repo:String!, $number:Int!) {
       commits(last:10) { nodes { commit { statusCheckRollup { state } } } }
       reviewThreads(last:100) {
         pageInfo { hasPreviousPage }
-        nodes { id isResolved isOutdated path line
+        nodes { id isResolved isOutdated path line originalLine
                 comments(first:20) { totalCount nodes { ...C } }
                 tail: comments(last:5) { nodes { ...C } } }
       }
@@ -182,7 +183,7 @@ try {
         id: t.id,
         isBot: isBot(first),
         isOutdated: t.isOutdated,
-        line: t.line,
+        line: t.line ?? t.originalLine,
         path: t.path,
         userVotes: votes(first),
       },
