@@ -30,11 +30,11 @@ gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,
 
 When `commentCount` is more than the comments you got, the middle of that thread is missing; read it on the PR before you reply.
 
-In a thread the first comment is the feedback and the rest is the discussion so far. A review body or conversation comment has no thread: a `me` comment that links to it is its discussion. A vote (`userVotes`) from `me`, or a non-`isBot` `me` comment, is the author's position; an `isBot` `me` comment is feedback to act on. Don't reply again to a thread whose last comment is a non-`isBot` `me` comment unless it asks something new; if that reply reported a fix, the resolve did not land, so resolve it now.
+In a thread the first comment is the feedback and the rest is the discussion so far. A review body or conversation comment has no thread: a `me` comment that links to it is its discussion. A vote (`userVotes`) from `me`, or a non-`isBot` `me` comment, is the author's position; an `isBot` `me` comment is feedback to act on. Don't reply again to a thread whose last comment is a non-`isBot` `me` comment unless it asks something new; if that reply was not an `Asked`, the resolve did not land, so resolve it now.
 
 ## Conflicts
 
-GitHub mode. If `mergeable` is `CONFLICTING`, merge `base` (from `fetch.ts`) into the branch first (not a rebase, which breaks the commit links in earlier replies), keep both sides' intent in each conflict, and push. `UNKNOWN` means GitHub is still computing it. In both cases run `fetch.ts` again.
+GitHub mode. If `mergeable` is `CONFLICTING`, merge the base (`base` from `fetch.ts`) into the branch first: `git fetch origin <base> && git merge FETCH_HEAD`. Fetch it, don't merge a bare local `<base>` that may be stale or missing, and don't rebase, which breaks the commit links in earlier replies. Keep both sides' intent in each conflict, and push. `UNKNOWN` means GitHub is still computing it: wait a few seconds before re-fetching. In both cases run `fetch.ts` again.
 
 ## Decide
 
@@ -60,7 +60,7 @@ GitHub mode. Push the fixes before you post.
    - Review body or conversation comment: `gh pr comment N --body-file FILE`, opening with a link to what it answers: `Re [short label](url)`.
 3. Vote on the feedback (`comments[0].id` of a thread, or the `id` of a review body or conversation comment) unless `userVotes` already holds one. `THUMBS_UP` when it should be addressed: fixed, or agreed but out of scope. `THUMBS_DOWN` when declined, but only on an automated comment (`isBot`); a human's decline is carried by the reply alone. No vote when asked or outdated.
    `gh api graphql -f query='mutation($id:ID!,$c:ReactionContent!){addReaction(input:{subjectId:$id,content:$c}){reaction{content}}}' -f id=ID -f c=THUMBS_UP`
-4. Resolve fixed and outdated threads, and hide fixed and outdated conversation comments with the minimize command from **Fetch**. Declined and asked ones stay open for the reviewer; out-of-scope ones stay open until a follow-up link is in the thread.
+4. Resolve every thread you replied to, and hide every conversation comment you replied to with the minimize command from **Fetch**: fixed, declined, out of scope and outdated alike. Only an `Asked` one stays open, because the reviewer has not answered it yet.
    `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=THREAD_ID`
 
 Replies are one or two sentences, outcome first. Fixed: what changed plus the linked sha, and the reason when the fix is not the one suggested. Declined: the line or symbol that answers the comment. Out of scope: agree and say it goes to a follow-up. No openers like "Great point" or "You're right", and no recap of their comment.
