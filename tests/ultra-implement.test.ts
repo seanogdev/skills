@@ -231,3 +231,13 @@ test('leaves the type check to the finisher', async () => {
   assert.doesNotMatch(promptFor(run, 'implement:A'), /Run the type check/u);
   assert.match(promptFor(run, 'finish:A'), /Run the type check once, as the last check/u);
 });
+
+test('shares one before server across the run and stops it at the end', async () => {
+  const run = await runWorkflow([issue('A')], {
+    preflight: { beforePid: '42', beforeUrl: 'BEFORE URL', beforeWorktree: 'BEFORE PATH', browser: 'ready', notes: '' },
+  });
+  assert.match(promptFor(run, 'implement:A'), /BEFORE URL/u);
+  assert.match(promptFor(run, 'finish:A'), /BEFORE URL/u);
+  assert.equal(labels(run).at(-1), 'stop-before');
+  assert.match(promptFor(run, 'stop-before'), /42[\s\S]*BEFORE PATH/u);
+});

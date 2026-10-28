@@ -60,6 +60,9 @@ const BRANCH_SCHEMA = {
 
 const PREFLIGHT_SCHEMA = {
   properties: {
+    beforePid: { type: 'string' },
+    beforeUrl: { type: 'string' },
+    beforeWorktree: { type: 'string' },
     browser: { enum: ['ready', 'not_needed', 'blocked'] },
     notes: { type: 'string' },
     reason: { type: 'string' },
@@ -190,7 +193,8 @@ Return:
 Find out how this repo's app is checked in a real browser, from the project instructions and the docs they point to. Change no code and no tracker item.
 If no sub-issue changes something visible in the app, return not_needed.
 Otherwise start the dev server from this checkout, open the app in a browser session of your own, and confirm that the saved login reaches the app. Find test data on this account that the sub-issues can use: ids that exist and hold the data they need. Then stop the dev server and close the session.
-Return ready, with notes on how to start the dev server and find its port, how to log in, how to override feature flags, and the test data ids. Return blocked, with the reason, when the dev server or the login does not work.`,
+Then start the before server, which every agent of this run uses for its before screenshots. Add a worktree of the remote default branch (git symbolic-ref refs/remotes/origin/HEAD) outside this checkout with git worktree add --detach, install its dependencies, and start its dev server detached, so that it keeps running after you return, with its output in a log file. Confirm that it serves the app with the saved login, then leave it running.
+Return ready, with notes on how to start the dev server and find its port, how to log in, how to override feature flags, and the test data ids, and with the before server's URL as beforeUrl, its worktree path as beforeWorktree and its process id as beforePid. Return blocked, with the reason, when the dev server or the login does not work.`,
     { label: 'preflight', phase: 'Plan', schema: PREFLIGHT_SCHEMA },
   ),
 ]);
@@ -198,6 +202,14 @@ if (!plan) throw new Error('The plan agent stopped');
 if (preflight && preflight.browser === 'blocked') {
   log(`Browser preflight blocked: ${preflight.reason}`);
   return { parent, preflight, results: [] };
+}
+
+async function stopBefore() {
+  if (!preflight || !preflight.beforePid) return;
+  await agent(
+    `Stop the dev server with process id ${preflight.beforePid} and its child processes. Then run git worktree remove --force ${preflight.beforeWorktree}. Change nothing else.`,
+    { label: 'stop-before', phase: 'Address' },
+  );
 }
 
 const shared = plan.delivery.mode === 'shared' && plan.delivery.branch;
@@ -209,18 +221,20 @@ if (shared) {
   if (!branch || branch.status !== 'ready') {
     const reason = (branch && branch.reason) || 'The shared-branch agent stopped';
     log(`Shared branch blocked: ${reason}`);
+    await stopBefore();
     return { delivery: plan.delivery, parent, results: [], sharedBranch: { reason, status: 'blocked' } };
   }
 }
 const root = shared || plan.defaultBranch;
 log(`Delivery: ${plan.delivery.mode}${shared ? ` into ${shared}` : ''}. ${plan.delivery.reason}`);
 
+const before = preflight && preflight.browser === 'ready' && preflight.beforeUrl;
 const BROWSER_SETUP =
   preflight && preflight.browser === 'ready'
-    ? `\nBrowser setup, checked at the start of this run:\n${preflight.notes}`
+    ? `\nBrowser setup, checked at the start of this run:\n${preflight.notes}${before ? `\nThe before server at ${before} runs origin/${plan.defaultBranch} for the whole run. Take every before screenshot from it, and start no dev server or worktree for the before state. Its state is the default branch, so in a sub-issue that builds on another, name the predecessor's part of each difference.` : ''}`
     : '';
 const PRESERVE = plan.preserve
-  ? ` The spec is a refactor or a migration, so take the before screenshots from origin/${plan.defaultBranch}, not from the PR base. Compare before and after for each existing screen that renders a changed part. Fix each difference that the spec does not name.`
+  ? ` The spec is a refactor or a migration, so take the before screenshots from origin/${plan.defaultBranch}. Compare before and after for each existing screen that renders a changed part. Fix each difference that the spec does not name.`
   : '';
 const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.${PRESERVE}${BROWSER_SETUP}`;
 
@@ -403,9 +417,10 @@ ${SPEC}
 
 git fetch, then create a local branch from origin/${plan.defaultBranch} and merge each of these PR branches into it as origin/<branch>. Never push that merge. Resolve a conflict in the way that keeps both changes.
 ${branches.join('\n')}
-Compare each screen that the run touched with origin/${plan.defaultBranch} in a browser: start the app once from the merge and once from origin/${plan.defaultBranch}. Return each difference that the spec does not name, with the PR that it comes from, in differences. Return an empty list when there is none.${BROWSER_SETUP}`,
+Compare each screen that the run touched with origin/${plan.defaultBranch} in a browser: start the app from the merge, and ${before ? `use the before server at ${before} for origin/${plan.defaultBranch}` : `once from origin/${plan.defaultBranch}`}. Return each difference that the spec does not name, with the PR that it comes from, in differences. Return an empty list when there is none.${BROWSER_SETUP}`,
       { isolation: 'worktree', label: 'preserve-check', phase: 'Finish', schema: PRESERVE_SCHEMA },
     );
   }
 }
+await stopBefore();
 return { delivery: plan.delivery, parent, preserveCheck, results, sharedBranch: shared || undefined };
