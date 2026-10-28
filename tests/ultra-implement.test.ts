@@ -55,11 +55,10 @@ function defaultReply(label: string): Reply {
   const id = parts.at(-1);
   if (step === 'implement' && id?.startsWith('S'))
     return { branch: `branch-${id}`, stage: 'Complete', status: 'landed', verified: `VERIFIED ${id}` };
-  if (step === 'implement')
-    return { branch: `branch-${id}`, prUrl: `pr-${id}`, status: 'pr_opened', verified: `VERIFIED ${id}` };
+  if (step === 'implement') return { branch: `branch-${id}`, status: 'pushed', verified: `VERIFIED ${id}` };
   if (step === 'review') return { findings: [] };
-  if (step === 'open-pr') return { prUrl: 'pr-shared', status: 'opened' };
   if (step === 'address') return { stage: 'In review', status: 'addressed' };
+  if (step === 'finish') return { prUrl: `pr-${id}`, status: 'ready' };
   return { status: 'ready' };
 }
 
@@ -126,8 +125,9 @@ test('runs a chain in order and stacks each branch on its predecessor', async ()
     assert.ok(order.indexOf(first) < order.indexOf(then), `${first} before ${then}`);
   assert.equal(order.length, 11);
   assert.match(promptFor(run, 'implement:A'), /origin\/main/u);
-  assert.match(promptFor(run, 'implement:B'), /--base branch-A/u);
-  assert.match(promptFor(run, 'implement:C'), /--base branch-B/u);
+  assert.match(promptFor(run, 'implement:B'), /origin\/branch-A/u);
+  assert.match(promptFor(run, 'finish:B'), /--base branch-A/u);
+  assert.match(promptFor(run, 'finish:C'), /--base branch-B/u);
 });
 
 test('starts siblings together once their shared predecessor is ready', async () => {
@@ -138,7 +138,7 @@ test('starts siblings together once their shared predecessor is ready', async ()
 
 test('merges every extra predecessor into a sub-issue with several', async () => {
   const run = await runWorkflow([issue('A'), issue('B'), issue('C', ['A', 'B'])]);
-  assert.match(promptFor(run, 'implement:C'), /--base branch-A/u);
+  assert.match(promptFor(run, 'implement:C'), /origin\/branch-A/u);
   assert.match(promptFor(run, 'implement:C'), /Merge origin\/branch-B/u);
 });
 
@@ -184,7 +184,8 @@ test('blocks the sub-issues after a failed finish', async () => {
 
 test('lets the sub-issues after one that needs a person run', async () => {
   const run = await runWorkflow([issue('A'), issue('B', ['A'])], {
-    reply: (label) => (label === 'finish:A' ? { reason: 'no archived project', status: 'needs_person' } : undefined),
+    reply: (label) =>
+      label === 'finish:A' ? { prUrl: 'pr-A', reason: 'no archived project', status: 'needs_person' } : undefined,
   });
   assert.deepEqual(statuses(run), { A: 'needs_person', B: 'ready' });
 });
@@ -279,7 +280,8 @@ test('moves the sub-issue in the address step, not the finish step', async () =>
 
 test('leaves a sub-issue that needs a person in progress after the address step', async () => {
   const run = await runWorkflow([issue('A')], {
-    reply: (label) => (label === 'finish:A' ? { reason: 'no archived project', status: 'needs_person' } : undefined),
+    reply: (label) =>
+      label === 'finish:A' ? { prUrl: 'pr-A', reason: 'no archived project', status: 'needs_person' } : undefined,
   });
   assert.match(promptFor(run, 'address:A'), /leave each issue in its stage/u);
 });
@@ -291,11 +293,11 @@ test('lands every slice on the shared branch and opens one PR for them', async (
   assert.deepEqual(statuses(run), { S1: 'landed', S2: 'landed', S3: 'landed' });
   const order = labels(run);
   assert.deepEqual(
-    order.filter((l) => ['open-pr', 'finish:shared', 'address:shared'].includes(l) || l.startsWith('finish:S')),
-    ['open-pr', 'finish:shared', 'address:shared'],
+    order.filter((l) => l.startsWith('finish:') || l.startsWith('address:')),
+    ['finish:shared', 'address:shared'],
   );
   assert.ok(order.indexOf('implement:S1') < order.indexOf('implement:S2'));
-  assert.ok(order.indexOf('implement:S2') < order.indexOf('open-pr'));
+  assert.ok(order.indexOf('implement:S2') < order.indexOf('finish:shared'));
   assert.match(promptFor(run, 'implement:S2'), /origin\/checkout/u);
   assert.match(promptFor(run, 'implement:S2'), /open no PR/u);
   assert.deepEqual(run.result.pr, {
@@ -331,8 +333,8 @@ test('leaves out a blocked slice and the slices after it from the combined PR', 
     reply: (label) => (label === 'implement:S1' ? { reason: 'no endpoint', status: 'blocked' } : undefined),
   });
   assert.deepEqual(statuses(run), { S1: 'blocked', S2: 'blocked', S3: 'landed' });
-  assert.doesNotMatch(promptFor(run, 'open-pr'), /DESCRIPTION S1/u);
-  assert.match(promptFor(run, 'open-pr'), /DESCRIPTION S3/u);
+  assert.doesNotMatch(promptFor(run, 'finish:shared'), /DESCRIPTION S1/u);
+  assert.match(promptFor(run, 'finish:shared'), /DESCRIPTION S3/u);
 });
 
 test('opens no PR when no slice lands', async () => {
@@ -341,5 +343,21 @@ test('opens no PR when no slice lands', async () => {
     reply: (label) => (label === 'implement:S1' ? { reason: 'tests fail', status: 'failed' } : undefined),
   });
   assert.equal(run.result.pr, undefined);
-  assert.ok(!labels(run).includes('open-pr'));
+  assert.ok(!labels(run).includes('finish:shared'));
+});
+
+test('opens the PR in the finish step, after the review', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'implement:A'), /Open no PR/u);
+  assert.match(promptFor(run, 'review:spec:A'), /It has no PR yet/u);
+  assert.match(promptFor(run, 'finish:A'), /Then open the PR, ready for review/u);
+  assert.match(promptFor(run, 'address:A'), /Address PR pr-A/u);
+});
+
+test('fails a sub-issue whose finisher opens no PR', async () => {
+  const run = await runWorkflow([issue('A')], {
+    reply: (label) => (label === 'finish:A' ? { status: 'ready' } : undefined),
+  });
+  assert.deepEqual(statuses(run), { A: 'failed' });
+  assert.ok(!labels(run).includes('address:A'));
 });
