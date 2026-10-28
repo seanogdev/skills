@@ -386,3 +386,8 @@ test('falls back to a generic CI brief when the CI agent stops', async () => {
   assert.doesNotMatch(promptFor(run, 'implement:A'), /Before you push, run locally/u);
   assert.match(promptFor(run, 'address:A'), /Wait for a review bot that posts comments too/u);
 });
+
+test('pushes the address fixes once per round', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'address:A'), /Make every fix of the round before you push, then push once/u);
+});

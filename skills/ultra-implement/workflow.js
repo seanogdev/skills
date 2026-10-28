@@ -396,7 +396,7 @@ ${t.brief}
 git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
 ${CI_ADDRESS}
 1. Wait until every CI check on the PR has finished, and the review bot's review if one runs. Use gh pr checks ${prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
-2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, and reply to each comment. Make every fix of the round before you push, then push once: each push restarts CI and cancels the runs still going, and a review bot that reviews each push reviews it again. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
 3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for anything that stays open.`;
 }
 
