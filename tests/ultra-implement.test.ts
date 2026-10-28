@@ -68,7 +68,7 @@ async function parallel(fns: (() => Promise<unknown>)[]) {
 
 async function runWorkflow(
   subIssues: SubIssue[],
-  options: { delivery?: Reply; preflight?: Reply; reply?: (label: string) => Reply | undefined } = {},
+  options: { ci?: Reply; delivery?: Reply; preflight?: Reply; reply?: (label: string) => Reply | undefined } = {},
 ): Promise<Run> {
   const calls: Call[] = [];
   async function agent(prompt: string, opts: { label: string }) {
@@ -82,6 +82,10 @@ async function runWorkflow(
         spec: 'PARENT SPEC',
         subIssues,
       };
+    if (opts.label === 'ci')
+      return options.ci === undefined
+        ? { checks: 'CI CHECKS', humanReview: 'one approval', reviewBot: 'on_open' }
+        : options.ci;
     if (opts.label === 'preflight') return options.preflight ?? { browser: 'ready', notes: 'PREFLIGHT NOTES' };
     const reply = options.reply?.(opts.label);
     return reply === undefined ? defaultReply(opts.label) : reply;
@@ -123,7 +127,7 @@ test('runs a chain in order and stacks each branch on its predecessor', async ()
     ['finish:C', 'address:C'],
   ])
     assert.ok(order.indexOf(first) < order.indexOf(then), `${first} before ${then}`);
-  assert.equal(order.length, 11);
+  assert.equal(order.length, 12);
   assert.match(promptFor(run, 'implement:A'), /origin\/main/u);
   assert.match(promptFor(run, 'implement:B'), /origin\/branch-A/u);
   assert.match(promptFor(run, 'finish:B'), /--base branch-A/u);
@@ -159,7 +163,7 @@ test('passes review findings to the finisher', async () => {
 test('skips a dependency cycle and the sub-issues after it', async () => {
   const run = await runWorkflow([issue('A', ['B']), issue('B', ['A']), issue('C', ['A'])]);
   assert.deepEqual(statuses(run), { A: 'skipped', B: 'skipped', C: 'skipped' });
-  assert.deepEqual(labels(run), ['plan', 'preflight']);
+  assert.deepEqual(labels(run), ['plan', 'preflight', 'ci']);
 });
 
 test('blocks the sub-issues after a skipped one', async () => {
@@ -202,7 +206,7 @@ test('stops before any sub-issue when the browser preflight is blocked', async (
     preflight: { browser: 'blocked', notes: '', reason: 'login expired' },
   });
   assert.deepEqual(run.result.results, []);
-  assert.deepEqual(labels(run), ['plan', 'preflight']);
+  assert.deepEqual(labels(run), ['plan', 'preflight', 'ci']);
 });
 
 test('gives the preflight notes to the implementer and the finisher', async () => {
@@ -218,7 +222,7 @@ test('leaves the preflight notes out when no browser check is needed', async () 
 
 test('gives the spec and the sub-issue description to every agent after the plan', async () => {
   const run = await runWorkflow([issue('A')]);
-  for (const call of run.calls.filter((c) => !['plan', 'preflight'].includes(c.label))) {
+  for (const call of run.calls.filter((c) => !['plan', 'preflight', 'ci'].includes(c.label))) {
     assert.match(call.prompt, /PARENT SPEC/u, call.label);
     assert.match(call.prompt, /DESCRIPTION A/u, call.label);
   }
@@ -360,4 +364,25 @@ test('fails a sub-issue whose finisher opens no PR', async () => {
   });
   assert.deepEqual(statuses(run), { A: 'failed' });
   assert.ok(!labels(run).includes('address:A'));
+});
+
+test('gives the CI checks to the implementer and the finisher, and the review bot to the addresser', async () => {
+  const run = await runWorkflow([issue('A')], {
+    ci: { checks: 'CI CHECKS', humanReview: 'one approval', reviewBot: 'on_push', reviewBotNotes: 'BOT NOTES' },
+  });
+  assert.match(promptFor(run, 'implement:A'), /Before you push, run locally[\s\S]*CI CHECKS/u);
+  assert.match(promptFor(run, 'finish:A'), /Run the type check once, as the last check[\s\S]*CI CHECKS/u);
+  assert.match(promptFor(run, 'address:A'), /reviews again after each push[\s\S]*BOT NOTES/u);
+  assert.match(promptFor(run, 'address:A'), /Do not wait for a human review/u);
+});
+
+test('tells the addresser when no review bot runs', async () => {
+  const run = await runWorkflow([issue('A')], { ci: { checks: 'CI CHECKS', humanReview: '', reviewBot: 'none' } });
+  assert.match(promptFor(run, 'address:A'), /No review bot runs/u);
+});
+
+test('falls back to a generic CI brief when the CI agent stops', async () => {
+  const run = await runWorkflow([issue('A')], { ci: null });
+  assert.doesNotMatch(promptFor(run, 'implement:A'), /Before you push, run locally/u);
+  assert.match(promptFor(run, 'address:A'), /Wait for a review bot that posts comments too/u);
 });

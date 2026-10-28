@@ -83,6 +83,17 @@ const IMPLEMENT_SCHEMA = {
   type: 'object',
 };
 
+const CI_SCHEMA = {
+  properties: {
+    checks: { type: 'string' },
+    humanReview: { type: 'string' },
+    reviewBot: { enum: ['none', 'on_open', 'on_push'] },
+    reviewBotNotes: { type: 'string' },
+  },
+  required: ['checks', 'humanReview', 'reviewBot'],
+  type: 'object',
+};
+
 const FINDINGS_SCHEMA = {
   properties: {
     findings: {
@@ -173,7 +184,7 @@ const WORKTREE = `You work in a fresh worktree: install the dependencies before 
 Before you return, stop each dev server and browser session that you started.`;
 
 phase('Plan');
-const [plan, preflight] = await Promise.all([
+const [plan, preflight, ci] = await Promise.all([
   agent(
     `${READ}
 The parent's description is the spec for every sub-issue. Do not change anything.
@@ -198,11 +209,20 @@ Then start the before server, which every agent of this run uses for its before 
 Return ready, with notes on how to start the dev server and find its port, how to log in, how to override feature flags, and the test data ids, and with the before server's URL as beforeUrl, its worktree path as beforeWorktree and its process id as beforePid. Return blocked, with the reason, when the dev server or the login does not work.`,
     { label: 'preflight', phase: 'Plan', schema: PREFLIGHT_SCHEMA },
   ),
+  agent(
+    `Find out what CI does with a PR in this repo, before any work starts. Change nothing. You run in the user's own checkout, so leave its branch and working tree as they are.
+Read the CI config (such as .github/workflows), CODEOWNERS, the project instructions, and the branch protection of the remote default branch (gh api repos/{owner}/{repo}/branches/<branch>/protection, which may be refused). Then look at the last five merged PRs with gh pr list --state merged, gh pr checks and gh pr view --comments, to see which checks and reviewers actually turn up.
+Return:
+- checks: each check that runs on a PR, its trigger, roughly how long it takes, and the local command that reproduces it. Say which checks run only for some paths, some labels, or a PR to the default branch, so that a PR to another branch skips them.
+- reviewBot: on_open when a bot reviews a PR only when it opens or leaves draft, on_push when it reviews again after each push, none when no bot reviews. reviewBotNotes: its name, how it posts (a review, inline comments or a summary comment), and any trigger such as a label.
+- humanReview: the approvals that a merge needs, and who owns which paths.`,
+    { label: 'ci', phase: 'Plan', schema: CI_SCHEMA },
+  ),
 ]);
 if (!plan) throw new Error('The plan agent stopped');
 if (preflight && preflight.browser === 'blocked') {
   log(`Browser preflight blocked: ${preflight.reason}`);
-  return { parent, preflight, results: [] };
+  return { ci, parent, preflight, results: [] };
 }
 
 async function stopBefore() {
@@ -223,7 +243,7 @@ if (shared) {
     const reason = (branch && branch.reason) || 'The shared-branch agent stopped';
     log(`Shared branch blocked: ${reason}`);
     await stopBefore();
-    return { delivery: plan.delivery, parent, results: [], sharedBranch: { reason, status: 'blocked' } };
+    return { ci, delivery: plan.delivery, parent, results: [], sharedBranch: { reason, status: 'blocked' } };
   }
 }
 const root = shared || plan.defaultBranch;
@@ -241,6 +261,18 @@ const CHECKS = `Test every change. Write automated tests where they fit, at the 
 const SCREENSHOTS = `When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
 const BRANCH_NAME = `Name the branch for this sub-issue, in the repo's branch naming convention: follow the project instructions and the recent branches on the remote.`;
 const OUTSIDE = `If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
+const CI_LOCAL = ci
+  ? ` Before you push, run locally each CI check that your change can break, apart from the type check. The CI checks, found at the start of this run:\n${ci.checks}`
+  : '';
+const BOT = {
+  none: 'No review bot runs on this repo, so address the review comments that are there.',
+  on_open: 'The review bot reviews a PR once, when it opens, so later pushes get no new bot review.',
+  on_push:
+    'The review bot reviews again after each push. After each push, wait for its new review and address it too, for at most 3 rounds in all. Return failed, with the open comments, when a fourth round would be needed.',
+};
+const CI_ADDRESS = ci
+  ? `CI on this repo, found at the start of this run:\n${ci.checks}\nReview bot: ${BOT[ci.reviewBot] || BOT.on_open}${ci.reviewBotNotes ? ` ${ci.reviewBotNotes}` : ''}\nDo not wait for a human review: the user handles it.`
+  : 'Wait for a review bot that posts comments too, if one runs. Do not wait for a human review: the user handles it.';
 const OK = new Set(['ready', 'needs_person', 'landed']);
 
 const { subIssues } = plan;
@@ -307,7 +339,7 @@ function implementPrompt(s, bases) {
   return `${startPrompt(s)}
 2. git fetch, then create a branch from origin/${base}. ${BRANCH_NAME}${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
 3. ${build('verified')}
-4. ${CHECKS}${PRESERVE}${BROWSER_SETUP}
+4. ${CHECKS}${CI_LOCAL}${PRESERVE}${BROWSER_SETUP}
 5. Commit in small logical steps and push the branch. Open no PR: the finish step opens it after the review, so that CI and any review bot see the finished code.
 6. Leave the sub-issue in progress. The address step moves it once CI passes.
 7. Return pushed, with verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screens that changed, for the PR's screenshots.
@@ -319,7 +351,7 @@ function slicePrompt(s) {
   return `${startPrompt(s)}
 2. git fetch, then create a branch from origin/${shared}. ${BRANCH_NAME}
 3. ${build('verified')}
-4. ${CHECKS}${PRESERVE}${BROWSER_SETUP}
+4. ${CHECKS}${CI_LOCAL}${PRESERVE}${BROWSER_SETUP}
 5. Commit in small logical steps. Do not push this branch, and open no PR: one PR takes the shared branch ${shared} to ${plan.defaultBranch} once every sub-issue has landed on it.
 6. Land the sub-issue on the shared branch: git fetch, git merge origin/${shared}, and when the merge brought in changes, run the test files that cover the files that it touched. Then git push origin HEAD:${shared}. Other sub-issues land on it at the same time, so when the push is rejected, repeat this step.
 7. Move the sub-issue to the stage that the project instructions give a sub-issue that lands on a shared branch, then read its stage back from the tracker and return it as stage. Without such an instruction, leave it in progress.
@@ -349,7 +381,7 @@ The implementers verified the change like this:
 ${t.verified}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule: ${CHECKS}${BROWSER_SETUP}
 Take the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}
-Run the type check once, as the last check, after your last code change. Fix what it finds, then push.
+Run the type check once, as the last check, after your last code change${ci ? `, together with each other CI check that your fixes can break:\n${ci.checks}\n` : '. '}Fix what it finds, then push.
 Then open the PR, ready for review and not as a draft, since a review bot may review it only when it opens. ${t.open} Its body follows the repo's PR template, matches the final diff, and holds the test notes and screenshots.
 Leave each issue in its stage. The address step moves it once CI passes.
 Return ready, with prUrl, when all of this passes. Return needs_person, with prUrl, when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse), and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass, and open no PR.`;
@@ -362,7 +394,8 @@ ${WORKTREE}
 ${t.brief}
 
 git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
-1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
+${CI_ADDRESS}
+1. Wait until every CI check on the PR has finished, and the review bot's review if one runs. Use gh pr checks ${prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
 2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
 3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for anything that stays open.`;
 }
@@ -509,4 +542,4 @@ Compare each screen that the run touched with origin/${plan.defaultBranch} in a 
   }
 }
 await stopBefore();
-return { delivery: plan.delivery, parent, pr, preserveCheck, results, sharedBranch: shared || undefined };
+return { ci, delivery: plan.delivery, parent, pr, preserveCheck, results, sharedBranch: shared || undefined };
