@@ -159,7 +159,14 @@ const LENSES = [
 const TRACKER = `Use the issue tracker tools that this session has (an MCP server or a CLI), and follow the tracker conventions in the project instructions, if any.`;
 const READ = `The parent issue is ${parent}. Read it, and its sub-issues. ${TRACKER}`;
 
-const WORKTREE = `You work in a fresh worktree: install the dependencies before the first build or test. Write files with the file tools, and run one plain command per shell call, since the worktree guard refuses heredocs, loops and shell variables. Give every wait a timeout, and when it runs out, find out why. Before you return, stop each dev server and browser session that you started.`;
+const WORKTREE = `You work in a fresh worktree: install the dependencies before the first build or test. A guard refuses each shell command that it cannot prove stays inside this worktree, so:
+- Write files with the file tools.
+- Run one plain command per shell call, with literal arguments. The guard refuses heredocs, loops, command substitution, shell variables, chains such as "; echo", bash -c, xargs, find -exec, and eval in any command, agent-browser eval included.
+- Run git here only: no git -C, and no cd into another checkout.
+- Read the page with agent-browser snapshot, get and is.
+- Format, lint and test with the repo's own package scripts, not npx or a formatter that the repo does not use.
+- Bound each wait with the shell tool's timeout setting. There may be no timeout command, as on macOS. When a wait runs out, find out why.
+Before you return, stop each dev server and browser session that you started.`;
 
 phase('Plan');
 const [plan, preflight] = await Promise.all([
@@ -307,7 +314,7 @@ ${WORKTREE}
 ${brief(s)}
 
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
-1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with a timeout of at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
+1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
 2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
 3. After the last push, wait for the checks again the same way. Return addressed when they pass and no comment is open. Leave the sub-issue in its current stage. Return failed, with the reason, for anything that stays open.`;
 }
