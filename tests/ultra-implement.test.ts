@@ -53,7 +53,8 @@ function defaultReply(label: string): Reply {
   const parts = label.split(':');
   const [step] = parts;
   const id = parts.at(-1);
-  if (step === 'implement') return { branch: `branch-${id}`, prUrl: `pr-${id}`, status: 'pr_opened' };
+  if (step === 'implement')
+    return { branch: `branch-${id}`, prUrl: `pr-${id}`, status: 'pr_opened', verified: `VERIFIED ${id}` };
   if (step === 'review') return { findings: [] };
   return { stage: 'In review', status: 'ready' };
 }
@@ -218,4 +219,9 @@ test('gives the spec and the sub-issue description to every agent after the plan
     assert.match(call.prompt, /PARENT SPEC/u, call.label);
     assert.match(call.prompt, /DESCRIPTION A/u, call.label);
   }
+});
+
+test('gives the verification of the implementer to the finisher', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'finish:A'), /VERIFIED A/u);
 });

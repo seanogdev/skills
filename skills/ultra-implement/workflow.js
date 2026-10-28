@@ -74,6 +74,7 @@ const IMPLEMENT_SCHEMA = {
     prUrl: { type: 'string' },
     reason: { type: 'string' },
     status: { enum: ['pr_opened', 'blocked', 'failed'] },
+    verified: { type: 'string' },
   },
   required: ['status'],
   type: 'object',
@@ -268,6 +269,7 @@ ${brief(s)}
 5. Commit in small logical steps and push.
 6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
 7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The finish step moves it after the review.
+8. Return verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screenshots in the PR body.
 
 If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
 }
@@ -289,8 +291,10 @@ ${brief(s)}
 
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
-Then make sure the PR meets this rule: ${TESTING}
-Run the type check and the full test suite. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
+The implementer verified the PR like this:
+${impl.verified || 'It reported nothing.'}
+Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule, and replace only the screenshots it affects: ${TESTING}
+Run the type check. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
 Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage.
 Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse). Leave the sub-issue in progress, and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }
