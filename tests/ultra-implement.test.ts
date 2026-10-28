@@ -110,19 +110,17 @@ function promptFor(run: Run, label: string) {
 test('runs a chain in order and stacks each branch on its predecessor', async () => {
   const run = await runWorkflow([issue('A'), issue('B', ['A']), issue('C', ['B'])]);
   assert.deepEqual(statuses(run), { A: 'ready', B: 'ready', C: 'ready' });
-  assert.deepEqual(labels(run), [
-    'plan',
-    'preflight',
-    'implement:A',
-    'finish:A',
-    'address:A',
-    'implement:B',
-    'finish:B',
-    'address:B',
-    'implement:C',
-    'finish:C',
-    'address:C',
-  ]);
+  const order = labels(run);
+  for (const [first, then] of [
+    ['implement:A', 'finish:A'],
+    ['finish:A', 'implement:B'],
+    ['finish:A', 'address:A'],
+    ['implement:B', 'finish:B'],
+    ['finish:B', 'implement:C'],
+    ['finish:C', 'address:C'],
+  ])
+    assert.ok(order.indexOf(first) < order.indexOf(then), `${first} before ${then}`);
+  assert.equal(order.length, 11);
   assert.match(promptFor(run, 'implement:A'), /origin\/main/u);
   assert.match(promptFor(run, 'implement:B'), /--base branch-A/u);
   assert.match(promptFor(run, 'implement:C'), /--base branch-B/u);
@@ -240,4 +238,30 @@ test('shares one before server across the run and stops it at the end', async ()
   assert.match(promptFor(run, 'finish:A'), /BEFORE URL/u);
   assert.equal(labels(run).at(-1), 'stop-before');
   assert.match(promptFor(run, 'stop-before'), /42[\s\S]*BEFORE PATH/u);
+});
+
+test('starts a successor before its predecessor is addressed', async () => {
+  let addressedA = false;
+  let finishedBWhileAddressingA = false;
+  const run = await runWorkflow([issue('A'), issue('B', ['A'])], {
+    reply: (label) => {
+      if (label === 'finish:B') finishedBWhileAddressingA = !addressedA;
+      if (label !== 'address:A') return;
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          addressedA = true;
+          resolve({ status: 'addressed' });
+        }, 10);
+      }) as unknown as Reply;
+    },
+  });
+  assert.ok(finishedBWhileAddressingA);
+  assert.deepEqual(statuses(run), { A: 'ready', B: 'ready' });
+});
+
+test('fails a sub-issue whose address fails', async () => {
+  const run = await runWorkflow([issue('A')], {
+    reply: (label) => (label === 'address:A' ? { reason: 'CI red', status: 'failed' } : undefined),
+  });
+  assert.deepEqual(statuses(run), { A: 'failed' });
 });

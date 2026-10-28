@@ -384,24 +384,27 @@ function run(s) {
         reason: 'The finish agent stopped',
         status: 'failed',
       };
-    const done = { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
-    if (finish.status === 'failed') return done;
-
-    const address = await agent(addressPrompt(s, impl), {
-      isolation: 'worktree',
-      label: `address:${s.id}`,
-      phase: 'Address',
-      schema: ADDRESS_SCHEMA,
-    });
-    if (!address) return { ...done, reason: 'The address agent stopped', status: 'failed' };
-    if (address.status === 'failed') return { ...done, reason: address.reason, status: 'failed' };
-    return done;
+    return { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
   })();
   runs.set(s.id, result);
   return result;
 }
 
-const results = await Promise.all(subIssues.map(run));
+async function address(s) {
+  const done = await run(s);
+  if (done.status !== 'ready' && done.status !== 'needs_person') return done;
+  const addressed = await agent(addressPrompt(s, done), {
+    isolation: 'worktree',
+    label: `address:${s.id}`,
+    phase: 'Address',
+    schema: ADDRESS_SCHEMA,
+  });
+  if (!addressed) return { ...done, reason: 'The address agent stopped', status: 'failed' };
+  if (addressed.status === 'failed') return { ...done, reason: addressed.reason, status: 'failed' };
+  return done;
+}
+
+const results = await Promise.all(subIssues.map(address));
 
 let preserveCheck;
 if (plan.preserve && preflight && preflight.browser === 'ready') {
