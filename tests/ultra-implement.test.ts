@@ -84,7 +84,7 @@ async function runWorkflow(
       };
     if (opts.label === 'ci')
       return options.ci === undefined
-        ? { checks: 'CI CHECKS', humanReview: 'one approval', reviewBot: 'on_open' }
+        ? { checks: 'CI CHECKS', humanReview: 'one approval', reviewBot: 'on_open', typeCheck: 'TYPECHECK CMD' }
         : options.ci;
     if (opts.label === 'preflight') return options.preflight ?? { browser: 'ready', notes: 'PREFLIGHT NOTES' };
     const reply = options.reply?.(opts.label);
@@ -236,7 +236,7 @@ test('gives the verification of the implementer to the finisher', async () => {
 test('leaves the type check to the finisher', async () => {
   const run = await runWorkflow([issue('A')]);
   assert.doesNotMatch(promptFor(run, 'implement:A'), /Run the type check/u);
-  assert.match(promptFor(run, 'finish:A'), /Run the type check once, as the last check/u);
+  assert.match(promptFor(run, 'finish:A'), /Run the type check \(TYPECHECK CMD\) once, as the last check/u);
 });
 
 test('shares one before server across the run and stops it at the end', async () => {
@@ -354,7 +354,7 @@ test('opens the PR in the finish step, after the review', async () => {
   const run = await runWorkflow([issue('A')]);
   assert.match(promptFor(run, 'implement:A'), /Open no PR/u);
   assert.match(promptFor(run, 'review:spec:A'), /It has no PR yet/u);
-  assert.match(promptFor(run, 'finish:A'), /Then open the PR, ready for review/u);
+  assert.match(promptFor(run, 'finish:A'), /Then open the PR, as a draft or ready/u);
   assert.match(promptFor(run, 'address:A'), /Address PR pr-A/u);
 });
 
@@ -368,10 +368,19 @@ test('fails a sub-issue whose finisher opens no PR', async () => {
 
 test('gives the CI checks to the implementer and the finisher, and the review bot to the addresser', async () => {
   const run = await runWorkflow([issue('A')], {
-    ci: { checks: 'CI CHECKS', humanReview: 'one approval', reviewBot: 'on_push', reviewBotNotes: 'BOT NOTES' },
+    ci: {
+      checks: 'CI CHECKS',
+      humanReview: 'one approval',
+      reviewBot: 'on_push',
+      reviewBotNotes: 'BOT NOTES',
+      typeCheck: 'TYPECHECK CMD',
+    },
   });
   assert.match(promptFor(run, 'implement:A'), /Before you push, run locally[\s\S]*CI CHECKS/u);
-  assert.match(promptFor(run, 'finish:A'), /Run the type check once, as the last check[\s\S]*CI CHECKS/u);
+  assert.match(
+    promptFor(run, 'finish:A'),
+    /Run the type check \(TYPECHECK CMD\) once, as the last check[\s\S]*CI CHECKS/u,
+  );
   assert.match(promptFor(run, 'address:A'), /reviews again after each push[\s\S]*BOT NOTES/u);
   assert.match(promptFor(run, 'address:A'), /Do not wait for a human review/u);
 });
@@ -390,4 +399,23 @@ test('falls back to a generic CI brief when the CI agent stops', async () => {
 test('pushes the address fixes once per round', async () => {
   const run = await runWorkflow([issue('A')]);
   assert.match(promptFor(run, 'address:A'), /Make every fix of the round before you push, then push once/u);
+});
+
+test('tells the finisher when the repo has no type check', async () => {
+  const run = await runWorkflow([issue('A')], {
+    ci: { checks: 'CI CHECKS', humanReview: '', reviewBot: 'none', typeCheck: '' },
+  });
+  assert.match(promptFor(run, 'finish:A'), /The repo has no type check/u);
+});
+
+test('tells the addresser not to wait for or ask a bot that reviews only on request', async () => {
+  const run = await runWorkflow([issue('A')], {
+    ci: { checks: 'CI CHECKS', humanReview: '', reviewBot: 'on_request' },
+  });
+  assert.match(promptFor(run, 'address:A'), /Do not wait for it, and do not ask it/u);
+});
+
+test('opens the PR as a draft or ready as the project instructions say', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'finish:A'), /as a draft or ready for review as the project instructions say/u);
 });
