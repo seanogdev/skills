@@ -5,8 +5,8 @@ export const meta = {
     { detail: 'read the parent spec and order the sub-issues', title: 'Plan' },
     { detail: 'one agent per sub-issue, in its own worktree', title: 'Implement' },
     { detail: 'correctness, design and spec reviewers per PR', title: 'Review' },
-    { detail: 'fix findings, test, screenshots, move the issue', title: 'Finish' },
-    { detail: 'wait for CI and the CI review, then address the PR', title: 'Address' },
+    { detail: 'fix findings, test, screenshots', title: 'Finish' },
+    { detail: 'wait for CI and the CI review, address the PR, then move the issue', title: 'Address' },
   ],
   whenToUse: 'Run through the ultra-implement skill with the parent issue as args',
 };
@@ -106,7 +106,6 @@ const FINDINGS_SCHEMA = {
 const FINISH_SCHEMA = {
   properties: {
     reason: { type: 'string' },
-    stage: { type: 'string' },
     status: { enum: ['ready', 'needs_person', 'failed'] },
   },
   required: ['status'],
@@ -116,6 +115,7 @@ const FINISH_SCHEMA = {
 const ADDRESS_SCHEMA = {
   properties: {
     reason: { type: 'string' },
+    stage: { type: 'string' },
     status: { enum: ['addressed', 'failed'] },
   },
   required: ['status'],
@@ -289,7 +289,7 @@ ${brief(s)}
 4. ${TESTING}
 5. Commit in small logical steps and push.
 6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
-7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The finish step moves it after the review.
+7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The address step moves it once CI passes.
 8. Return verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screenshots in the PR body.
 
 If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
@@ -317,12 +317,12 @@ ${impl.verified || 'It reported nothing.'}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule, and replace only the screenshots it affects: ${TESTING}
 Update the PR body so it matches the final diff and holds the test notes and screenshots.
 Run the type check once, as the last check, after your last code change. Fix what it finds, then push.
-Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage.
-Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse). Leave the sub-issue in progress, and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
+Leave the sub-issue in progress. The address step moves it once CI passes.
+Return ready when all of this passes. Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse), and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }
 
-function addressPrompt(s, impl) {
-  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}.
+function addressPrompt(s, impl, move) {
+  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
 ${WORKTREE}
 
 ${brief(s)}
@@ -330,7 +330,7 @@ ${brief(s)}
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
 2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
-3. After the last push, wait for the checks again the same way. Return addressed when they pass and no comment is open. Leave the sub-issue in its current stage. Return failed, with the reason, for anything that stays open.`;
+3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? 'move the sub-issue to the in-review stage, read its stage back from the tracker, return it as stage, and return addressed' : 'leave the sub-issue in progress, since checks that need a person are still open, and return addressed'}. Return failed, with the reason, for anything that stays open.`;
 }
 
 const runs = new Map();
@@ -393,7 +393,7 @@ function run(s) {
 async function address(s) {
   const done = await run(s);
   if (done.status !== 'ready' && done.status !== 'needs_person') return done;
-  const addressed = await agent(addressPrompt(s, done), {
+  const addressed = await agent(addressPrompt(s, done, done.status === 'ready'), {
     isolation: 'worktree',
     label: `address:${s.id}`,
     phase: 'Address',
@@ -401,7 +401,7 @@ async function address(s) {
   });
   if (!addressed) return { ...done, reason: 'The address agent stopped', status: 'failed' };
   if (addressed.status === 'failed') return { ...done, reason: addressed.reason, status: 'failed' };
-  return done;
+  return { ...done, stage: addressed.stage };
 }
 
 const results = await Promise.all(subIssues.map(address));

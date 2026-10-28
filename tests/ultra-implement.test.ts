@@ -56,7 +56,8 @@ function defaultReply(label: string): Reply {
   if (step === 'implement')
     return { branch: `branch-${id}`, prUrl: `pr-${id}`, status: 'pr_opened', verified: `VERIFIED ${id}` };
   if (step === 'review') return { findings: [] };
-  return { stage: 'In review', status: 'ready' };
+  if (step === 'address') return { stage: 'In review', status: 'addressed' };
+  return { status: 'ready' };
 }
 
 async function parallel(fns: (() => Promise<unknown>)[]) {
@@ -264,4 +265,18 @@ test('fails a sub-issue whose address fails', async () => {
     reply: (label) => (label === 'address:A' ? { reason: 'CI red', status: 'failed' } : undefined),
   });
   assert.deepEqual(statuses(run), { A: 'failed' });
+});
+
+test('moves the sub-issue in the address step, not the finish step', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'finish:A'), /Leave the sub-issue in progress/u);
+  assert.match(promptFor(run, 'address:A'), /move the sub-issue to the in-review stage/u);
+  assert.equal((run.result.results[0] as Summary & { stage?: string }).stage, 'In review');
+});
+
+test('leaves a sub-issue that needs a person in progress after the address step', async () => {
+  const run = await runWorkflow([issue('A')], {
+    reply: (label) => (label === 'finish:A' ? { reason: 'no archived project', status: 'needs_person' } : undefined),
+  });
+  assert.match(promptFor(run, 'address:A'), /leave the sub-issue in progress/u);
 });
