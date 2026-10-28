@@ -264,7 +264,7 @@ ${brief(s)}
 
 1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
 2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
-3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. This includes the project instructions in each folder that you change, such as AGENTS.md or CLAUDE.md files nested in those folders. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the type check and the single test files as you go, and the full suite once at the end.
+3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. This includes the project instructions in each folder that you change, such as AGENTS.md or CLAUDE.md files nested in those folders. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the single test files as you go, and the full suite once at the end. Leave the type check to the finish step.
 4. ${TESTING}
 5. Commit in small logical steps and push.
 6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
@@ -294,7 +294,8 @@ ${findings.length > 0 ? `Reviewers found these problems. Treat findings that nam
 The implementer verified the PR like this:
 ${impl.verified || 'It reported nothing.'}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule, and replace only the screenshots it affects: ${TESTING}
-Run the type check. Push. Update the PR body so it matches the final diff and holds the test notes and screenshots.
+Update the PR body so it matches the final diff and holds the test notes and screenshots.
+Run the type check once, as the last check, after your last code change. Fix what it finds, then push.
 Move the sub-issue to the in-review stage only when all of this passes, then read its stage back from the tracker and return that as stage.
 Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse). Leave the sub-issue in progress, and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }

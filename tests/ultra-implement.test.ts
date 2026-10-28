@@ -225,3 +225,9 @@ test('gives the verification of the implementer to the finisher', async () => {
   const run = await runWorkflow([issue('A')]);
   assert.match(promptFor(run, 'finish:A'), /VERIFIED A/u);
 });
+
+test('leaves the type check to the finisher', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.doesNotMatch(promptFor(run, 'implement:A'), /Run the type check/u);
+  assert.match(promptFor(run, 'finish:A'), /Run the type check once, as the last check/u);
+});
