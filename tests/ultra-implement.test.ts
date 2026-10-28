@@ -24,7 +24,7 @@ interface Summary {
 
 interface Run {
   calls: Call[];
-  result: { results: Summary[] };
+  result: { pr?: Summary & { prUrl?: string; stage?: string }; results: Summary[] };
 }
 
 type Reply = Record<string, unknown> | null;
@@ -53,9 +53,12 @@ function defaultReply(label: string): Reply {
   const parts = label.split(':');
   const [step] = parts;
   const id = parts.at(-1);
+  if (step === 'implement' && id?.startsWith('S'))
+    return { branch: `branch-${id}`, stage: 'Complete', status: 'landed', verified: `VERIFIED ${id}` };
   if (step === 'implement')
     return { branch: `branch-${id}`, prUrl: `pr-${id}`, status: 'pr_opened', verified: `VERIFIED ${id}` };
   if (step === 'review') return { findings: [] };
+  if (step === 'open-pr') return { prUrl: 'pr-shared', status: 'opened' };
   if (step === 'address') return { stage: 'In review', status: 'addressed' };
   return { status: 'ready' };
 }
@@ -66,7 +69,7 @@ async function parallel(fns: (() => Promise<unknown>)[]) {
 
 async function runWorkflow(
   subIssues: SubIssue[],
-  options: { preflight?: Reply; reply?: (label: string) => Reply | undefined } = {},
+  options: { delivery?: Reply; preflight?: Reply; reply?: (label: string) => Reply | undefined } = {},
 ): Promise<Run> {
   const calls: Call[] = [];
   async function agent(prompt: string, opts: { label: string }) {
@@ -75,7 +78,7 @@ async function runWorkflow(
     if (opts.label === 'plan')
       return {
         defaultBranch: 'main',
-        delivery: { mode: 'separate', reason: 'test' },
+        delivery: options.delivery ?? { mode: 'separate', reason: 'test' },
         preserve: false,
         spec: 'PARENT SPEC',
         subIssues,
@@ -269,7 +272,7 @@ test('fails a sub-issue whose address fails', async () => {
 
 test('moves the sub-issue in the address step, not the finish step', async () => {
   const run = await runWorkflow([issue('A')]);
-  assert.match(promptFor(run, 'finish:A'), /Leave the sub-issue in progress/u);
+  assert.match(promptFor(run, 'finish:A'), /Leave each issue in its stage/u);
   assert.match(promptFor(run, 'address:A'), /move the sub-issue to the in-review stage/u);
   assert.equal((run.result.results[0] as Summary & { stage?: string }).stage, 'In review');
 });
@@ -278,5 +281,65 @@ test('leaves a sub-issue that needs a person in progress after the address step'
   const run = await runWorkflow([issue('A')], {
     reply: (label) => (label === 'finish:A' ? { reason: 'no archived project', status: 'needs_person' } : undefined),
   });
-  assert.match(promptFor(run, 'address:A'), /leave the sub-issue in progress/u);
+  assert.match(promptFor(run, 'address:A'), /leave each issue in its stage/u);
+});
+
+const SHARED = { branch: 'checkout', mode: 'shared', reason: 'one thing' };
+
+test('lands every slice on the shared branch and opens one PR for them', async () => {
+  const run = await runWorkflow([issue('S1'), issue('S2', ['S1']), issue('S3')], { delivery: SHARED });
+  assert.deepEqual(statuses(run), { S1: 'landed', S2: 'landed', S3: 'landed' });
+  const order = labels(run);
+  assert.deepEqual(
+    order.filter((l) => ['open-pr', 'finish:shared', 'address:shared'].includes(l) || l.startsWith('finish:S')),
+    ['open-pr', 'finish:shared', 'address:shared'],
+  );
+  assert.ok(order.indexOf('implement:S1') < order.indexOf('implement:S2'));
+  assert.ok(order.indexOf('implement:S2') < order.indexOf('open-pr'));
+  assert.match(promptFor(run, 'implement:S2'), /origin\/checkout/u);
+  assert.match(promptFor(run, 'implement:S2'), /open no PR/u);
+  assert.deepEqual(run.result.pr, {
+    branch: 'checkout',
+    findings: 0,
+    prUrl: 'pr-shared',
+    stage: 'In review',
+    status: 'ready',
+  });
+});
+
+test('reviews the combined PR once with every slice in the brief', async () => {
+  const run = await runWorkflow([issue('S1'), issue('S2')], { delivery: SHARED });
+  const reviews = run.calls.map((c) => c.label).filter((l) => l.startsWith('review:'));
+  assert.deepEqual(reviews.toSorted(), ['review:correctness:shared', 'review:design:shared', 'review:spec:shared']);
+  for (const step of ['review:spec:shared', 'finish:shared', 'address:shared']) {
+    assert.match(promptFor(run, step), /DESCRIPTION S1[\s\S]*DESCRIPTION S2/u, step);
+    assert.match(promptFor(run, step), /origin\/checkout/u, step);
+  }
+  assert.match(promptFor(run, 'finish:shared'), /VERIFIED S1[\s\S]*VERIFIED S2/u);
+  assert.match(promptFor(run, 'address:shared'), /move the parent issue PARENT to the in-review stage/u);
+});
+
+test('names the shared branch and each slice branch for what they hold', async () => {
+  const run = await runWorkflow([issue('S1')], { delivery: SHARED });
+  assert.match(promptFor(run, 'plan'), /not for its first sub-issue/u);
+  assert.match(promptFor(run, 'implement:S1'), /Name the branch for this sub-issue/u);
+});
+
+test('leaves out a blocked slice and the slices after it from the combined PR', async () => {
+  const run = await runWorkflow([issue('S1'), issue('S2', ['S1']), issue('S3')], {
+    delivery: SHARED,
+    reply: (label) => (label === 'implement:S1' ? { reason: 'no endpoint', status: 'blocked' } : undefined),
+  });
+  assert.deepEqual(statuses(run), { S1: 'blocked', S2: 'blocked', S3: 'landed' });
+  assert.doesNotMatch(promptFor(run, 'open-pr'), /DESCRIPTION S1/u);
+  assert.match(promptFor(run, 'open-pr'), /DESCRIPTION S3/u);
+});
+
+test('opens no PR when no slice lands', async () => {
+  const run = await runWorkflow([issue('S1')], {
+    delivery: SHARED,
+    reply: (label) => (label === 'implement:S1' ? { reason: 'tests fail', status: 'failed' } : undefined),
+  });
+  assert.equal(run.result.pr, undefined);
+  assert.ok(!labels(run).includes('open-pr'));
 });

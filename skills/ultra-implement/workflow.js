@@ -1,5 +1,5 @@
 export const meta = {
-  description: 'Implement every sub-issue of a parent issue as stacked PRs, in dependency order',
+  description: 'Implement every sub-issue of a parent issue in dependency order, as one combined PR or one PR each',
   name: 'ultra-implement',
   phases: [
     { detail: 'read the parent spec and order the sub-issues', title: 'Plan' },
@@ -76,7 +76,8 @@ const IMPLEMENT_SCHEMA = {
     branch: { type: 'string' },
     prUrl: { type: 'string' },
     reason: { type: 'string' },
-    status: { enum: ['pr_opened', 'blocked', 'failed'] },
+    stage: { type: 'string' },
+    status: { enum: ['pr_opened', 'landed', 'blocked', 'failed'] },
     verified: { type: 'string' },
   },
   required: ['status'],
@@ -107,6 +108,16 @@ const FINISH_SCHEMA = {
   properties: {
     reason: { type: 'string' },
     status: { enum: ['ready', 'needs_person', 'failed'] },
+  },
+  required: ['status'],
+  type: 'object',
+};
+
+const OPEN_SCHEMA = {
+  properties: {
+    prUrl: { type: 'string' },
+    reason: { type: 'string' },
+    status: { enum: ['opened', 'failed'] },
   },
   required: ['status'],
   type: 'object',
@@ -154,7 +165,7 @@ const LENSES = [
   },
   {
     focus:
-      'Each acceptance criterion of the sub-issue and each rule of the parent spec that applies to it: met, missed, or done differently without a reason.',
+      'Each acceptance criterion of the sub-issues in the PR and each rule of the parent spec that applies to it: met, missed, or done differently without a reason.',
     key: 'spec',
   },
 ];
@@ -184,8 +195,8 @@ Return:
 - preserve: true when the spec is a refactor or a migration, that is, it says that existing screens or callers must look and behave as before. Otherwise false.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
 - delivery: how the sub-issues reach the default branch, with the reason.
-  - shared: each sub-issue PR goes into one shared branch, and one PR takes that branch to the default branch. Pick it when the spec or the project instructions ask for one branch or one PR, or when a sub-issue alone leaves the default branch in a state that must not ship, such as a half-built feature with no flag, or a consumer that breaks until a later sub-issue lands. Give branch a short name for the whole change. A branch of that name that is already on the remote is the shared branch.
-  - separate: each sub-issue PR goes to the default branch, or to the branch of its predecessor. Pick it when each sub-issue can ship alone.`,
+  - shared: each sub-issue lands on one shared branch with no PR of its own, and one PR takes that branch to the default branch. Pick it when the sub-issues build one thing, such as one feature, one component or one migration, when the spec or the project instructions ask for one branch or one PR, or when a sub-issue alone leaves the default branch in a state that must not ship, such as a half-built feature with no flag, or a consumer that breaks until a later sub-issue lands. Give branch a short name for the whole change, not for its first sub-issue, in the repo's branch naming convention: follow the project instructions and the recent branches on the remote. A branch of that name that is already on the remote is the shared branch.
+  - separate: each sub-issue gets its own PR to the default branch, or to the branch of its predecessor. Pick it only when the sub-issues are separate pieces of work that each ship alone.`,
     { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
   ),
   agent(
@@ -236,7 +247,12 @@ const BROWSER_SETUP =
 const PRESERVE = plan.preserve
   ? ` The spec is a refactor or a migration, so take the before screenshots from origin/${plan.defaultBranch}. Compare before and after for each existing screen that renders a changed part. Fix each difference that the spec does not name.`
   : '';
-const TESTING = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there. When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.${PRESERVE}${BROWSER_SETUP}`;
+const CHECKS = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there.`;
+const SCREENSHOTS = `When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
+const TESTING = `${CHECKS} ${SCREENSHOTS}${PRESERVE}${BROWSER_SETUP}`;
+const BRANCH_NAME = `Name the branch for this sub-issue, in the repo's branch naming convention: follow the project instructions and the recent branches on the remote.`;
+const OUTSIDE = `If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
+const OK = new Set(['ready', 'needs_person', 'landed']);
 
 const { subIssues } = plan;
 const byId = new Map(subIssues.map((s) => [s.id, s]));
@@ -271,69 +287,149 @@ function label(s) {
 
 const SPEC = `The spec, from the description of the parent issue ${parent}:\n${plan.spec}`;
 
-function brief(s) {
-  return `The description of sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}:\n${s.description}\n\n${SPEC}\n\nThe spec and the sub-issue are above, so read neither from the tracker.`;
+function describe(s) {
+  return `The description of sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}:\n${s.description}`;
 }
 
-function implementPrompt(s, bases) {
-  const base = bases[0] || root;
-  const merges = bases.slice(1);
+function brief(s) {
+  return `${describe(s)}\n\n${SPEC}\n\nThe spec and the sub-issue are above, so read neither from the tracker.`;
+}
+
+function sharedBrief(slices) {
+  return `${slices.map((s) => describe(s)).join('\n\n')}\n\n${SPEC}\n\nThe spec and the sub-issues are above, so read none of them from the tracker.`;
+}
+
+function startPrompt(s) {
   return `Implement sub-issue ${label(s)}. State its title before you start. ${TRACKER}
 ${WORKTREE}
 
 ${brief(s)}
 
-1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
-2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
-3. Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. This includes the project instructions in each folder that you change, such as AGENTS.md or CLAUDE.md files nested in those folders. Where the spec's shape differs from it, follow the prior art and say so in the PR. Write tests first at the seams the spec names. Run the single test files as you go, and the full suite once at the end. Leave the type check to the finish step.
+1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.`;
+}
+
+function build(where) {
+  return `Build only what the sub-issue asks for. Before you write code, find how the repo already does the same kind of change, and follow that prior art. This includes the project instructions in each folder that you change, such as AGENTS.md or CLAUDE.md files nested in those folders. Where the spec's shape differs from it, follow the prior art and say so in ${where}. Write tests first at the seams the spec names. Run the single test files as you go, and the full suite once at the end. Leave the type check to the finish step.`;
+}
+
+function implementPrompt(s, bases) {
+  const base = bases[0] || root;
+  const merges = bases.slice(1);
+  return `${startPrompt(s)}
+2. git fetch, then create a branch from origin/${base}. ${BRANCH_NAME}${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
+3. ${build('the PR')}
 4. ${TESTING}
 5. Commit in small logical steps and push.
-6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.${shared ? ` The PR is one slice of the change on the shared branch ${shared}: say so in the PR body.` : ''}
+6. Open a PR with --base ${base} that follows the repo's PR template and links the sub-issue the way the project instructions allow.
 7. Leave the sub-issue in progress, even where the project instructions move it when a PR opens. The address step moves it once CI passes.
-8. Return verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screenshots in the PR body.
+8. Return pr_opened, with verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screenshots in the PR body.
 
-If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
+${OUTSIDE}`;
 }
 
-function reviewPrompt(s, impl, base, lens) {
-  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}.
-${brief(s)}
+function slicePrompt(s) {
+  return `${startPrompt(s)}
+2. git fetch, then create a branch from origin/${shared}. ${BRANCH_NAME}
+3. ${build('verified')}
+4. ${CHECKS}${PRESERVE}${BROWSER_SETUP}
+5. Commit in small logical steps. Do not push this branch, and open no PR: one PR takes the shared branch ${shared} to ${plan.defaultBranch} once every sub-issue has landed on it.
+6. Land the sub-issue on the shared branch: git fetch, git merge origin/${shared}, and when the merge brought in changes, run the test files that cover the files that it touched. Then git push origin HEAD:${shared}. Other sub-issues land on it at the same time, so when the push is rejected, repeat this step.
+7. Move the sub-issue to the stage that the project instructions give a sub-issue that lands on a shared branch, then read its stage back from the tracker and return it as stage. Without such an instruction, leave it in progress.
+8. Return landed, with verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screens that changed, for the PR's screenshots.
 
-git fetch, then read the change with git diff origin/${base}...origin/${impl.branch}, and any file at the branch with git show origin/${impl.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
-Report only the ${lens.key} problems: ${lens.focus}
-Read only. Behaviour that the parent spec or the sub-issue asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
+${OUTSIDE}`;
 }
 
-function finishPrompt(s, impl, findings) {
-  return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+function openPrompt(slices) {
+  return `Open the PR that takes the shared branch ${shared} to ${plan.defaultBranch}. ${TRACKER}
 ${WORKTREE}
 
-${brief(s)}
+${sharedBrief(slices.map((r) => byId.get(r.id)))}
 
-git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
-${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
-The implementer verified the PR like this:
-${impl.verified || 'It reported nothing.'}
+git fetch, then git switch --detach origin/${shared}. Change no code.
+If a PR from ${shared} to ${plan.defaultBranch} is open, use it. Otherwise open one with --head ${shared} --base ${plan.defaultBranch} that follows the repo's PR template and links each sub-issue above the way the project instructions allow.
+The implementers verified the sub-issues like this:
+${slices.map((r) => `${r.id}: ${r.verified || 'It reported nothing.'}`).join('\n')}
+Put each acceptance criterion and how it was checked in the PR body. ${SCREENSHOTS}${PRESERVE}${BROWSER_SETUP}
+Return opened with prUrl, or failed with the reason.`;
+}
+
+function reviewPrompt(t, lens) {
+  return `Review PR ${t.prUrl} for ${t.name}.
+${t.brief}
+
+git fetch, then read the change with git diff origin/${t.base}...origin/${t.branch}, and any file at the branch with git show origin/${t.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
+Report only the ${lens.key} problems: ${lens.focus}
+Read only. Behaviour that the parent spec or ${t.issues} asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
+}
+
+function finishPrompt(t, findings) {
+  return `Finish PR ${t.prUrl} for ${t.name} on branch ${t.branch}. ${TRACKER}
+${WORKTREE}
+
+${t.brief}
+
+git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
+${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and ${t.issues} first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
+The implementers verified the change like this:
+${t.verified}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule, and replace only the screenshots it affects: ${TESTING}
 Update the PR body so it matches the final diff and holds the test notes and screenshots.
 Run the type check once, as the last check, after your last code change. Fix what it finds, then push.
-Leave the sub-issue in progress. The address step moves it once CI passes.
+Leave each issue in its stage. The address step moves it once CI passes.
 Return ready when all of this passes. Return needs_person when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse), and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass.`;
 }
 
-function addressPrompt(s, impl, move) {
-  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+function addressPrompt(t, move) {
+  return `Address PR ${t.prUrl} for ${t.name} on branch ${t.branch}. ${TRACKER}
 ${WORKTREE}
 
-${brief(s)}
+${t.brief}
 
-git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
-1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
-2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
-3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? 'move the sub-issue to the in-review stage, read its stage back from the tracker, return it as stage, and return addressed' : 'leave the sub-issue in progress, since checks that need a person are still open, and return addressed'}. Return failed, with the reason, for anything that stays open.`;
+git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
+1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${t.prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
+3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for anything that stays open.`;
+}
+
+async function review(t, key) {
+  const reviews = await parallel(
+    LENSES.map(
+      (lens) => () =>
+        agent(reviewPrompt(t, lens), {
+          label: `review:${lens.key}:${key}`,
+          phase: 'Review',
+          schema: FINDINGS_SCHEMA,
+        }),
+    ),
+  );
+  const findings = reviews.filter(Boolean).flatMap((r) => r.findings);
+  const done = { branch: t.branch, findings: findings.length, prUrl: t.prUrl };
+  const finish = await agent(finishPrompt(t, findings), {
+    isolation: 'worktree',
+    label: `finish:${key}`,
+    phase: 'Finish',
+    schema: FINISH_SCHEMA,
+  });
+  if (!finish) return { ...done, reason: 'The finish agent stopped', status: 'failed' };
+  return { ...done, ...finish };
+}
+
+async function address(t, key, done) {
+  if (done.status !== 'ready' && done.status !== 'needs_person') return done;
+  const addressed = await agent(addressPrompt(t, done.status === 'ready'), {
+    isolation: 'worktree',
+    label: `address:${key}`,
+    phase: 'Address',
+    schema: ADDRESS_SCHEMA,
+  });
+  if (!addressed) return { ...done, reason: 'The address agent stopped', status: 'failed' };
+  if (addressed.status === 'failed') return { ...done, reason: addressed.reason, status: 'failed' };
+  return { ...done, stage: addressed.stage };
 }
 
 const runs = new Map();
+const targets = new Map();
 
 function run(s) {
   if (runs.has(s.id)) return runs.get(s.id);
@@ -341,14 +437,24 @@ function run(s) {
     const summary = { id: s.id, title: s.title, url: s.url };
     if (s.skip) return { ...summary, reason: s.reason, status: 'skipped' };
 
-    const before = await Promise.all(s.predecessors.map((id) => run(byId.get(id))));
-    const waiting = before.filter((r) => r.status !== 'ready' && r.status !== 'needs_person');
+    const done = await Promise.all(s.predecessors.map((id) => run(byId.get(id))));
+    const waiting = done.filter((r) => !OK.has(r.status));
     if (waiting.length > 0) {
       return { ...summary, reason: `Waits on ${waiting.map((r) => r.id).join(', ')}`, status: 'blocked' };
     }
 
-    const bases = before.map((r) => r.branch);
-    const base = bases[0] || root;
+    if (shared) {
+      const slice = await agent(slicePrompt(s), {
+        isolation: 'worktree',
+        label: `implement:${s.id}`,
+        phase: 'Implement',
+        schema: IMPLEMENT_SCHEMA,
+      });
+      if (!slice) return { ...summary, reason: 'The implement agent stopped', status: 'failed' };
+      return { ...summary, ...slice };
+    }
+
+    const bases = done.map((r) => r.branch);
     const impl = await agent(implementPrompt(s, bases), {
       isolation: 'worktree',
       label: `implement:${s.id}`,
@@ -358,59 +464,67 @@ function run(s) {
     if (!impl) return { ...summary, reason: 'The implement agent stopped', status: 'failed' };
     if (impl.status !== 'pr_opened') return { ...summary, ...impl };
 
-    const reviews = await parallel(
-      LENSES.map(
-        (lens) => () =>
-          agent(reviewPrompt(s, impl, base, lens), {
-            label: `review:${lens.key}:${s.id}`,
-            phase: 'Review',
-            schema: FINDINGS_SCHEMA,
-          }),
-      ),
-    );
-    const findings = reviews.filter(Boolean).flatMap((r) => r.findings);
-
-    const finish = await agent(finishPrompt(s, impl, findings), {
-      isolation: 'worktree',
-      label: `finish:${s.id}`,
-      phase: 'Finish',
-      schema: FINISH_SCHEMA,
-    });
-    if (!finish)
-      return {
-        ...summary,
-        branch: impl.branch,
-        prUrl: impl.prUrl,
-        reason: 'The finish agent stopped',
-        status: 'failed',
-      };
-    return { ...summary, branch: impl.branch, findings: findings.length, prUrl: impl.prUrl, ...finish };
+    const t = {
+      base: bases[0] || root,
+      branch: impl.branch,
+      brief: brief(s),
+      issues: 'the sub-issue',
+      move: 'move the sub-issue to the in-review stage',
+      name: `sub-issue ${label(s)}`,
+      prUrl: impl.prUrl,
+      verified: impl.verified || 'It reported nothing.',
+    };
+    targets.set(s.id, t);
+    return { ...summary, ...(await review(t, s.id)) };
   })();
   runs.set(s.id, result);
   return result;
 }
 
-async function address(s) {
-  const done = await run(s);
-  if (done.status !== 'ready' && done.status !== 'needs_person') return done;
-  const addressed = await agent(addressPrompt(s, done, done.status === 'ready'), {
+async function finishShared(results) {
+  const landed = results.filter((r) => r.status === 'landed');
+  if (landed.length === 0) return;
+  const opened = await agent(openPrompt(landed), {
     isolation: 'worktree',
-    label: `address:${s.id}`,
-    phase: 'Address',
-    schema: ADDRESS_SCHEMA,
+    label: 'open-pr',
+    phase: 'Finish',
+    schema: OPEN_SCHEMA,
   });
-  if (!addressed) return { ...done, reason: 'The address agent stopped', status: 'failed' };
-  if (addressed.status === 'failed') return { ...done, reason: addressed.reason, status: 'failed' };
-  return { ...done, stage: addressed.stage };
+  if (!opened || opened.status !== 'opened' || !opened.prUrl)
+    return { branch: shared, reason: (opened && opened.reason) || 'The open-pr agent stopped', status: 'failed' };
+  const t = {
+    base: plan.defaultBranch,
+    branch: shared,
+    brief: sharedBrief(landed.map((r) => byId.get(r.id))),
+    issues: 'the sub-issues',
+    move: `move the parent issue ${parent} to the in-review stage, and each sub-issue of the PR that is still in progress too`,
+    name: `the sub-issues ${landed.map((r) => r.id).join(', ')} on the shared branch`,
+    prUrl: opened.prUrl,
+    verified: landed.map((r) => `${r.id}: ${r.verified || 'It reported nothing.'}`).join('\n'),
+  };
+  return address(t, 'shared', await review(t, 'shared'));
 }
 
-const results = await Promise.all(subIssues.map(address));
+let results;
+let pr;
+if (shared) {
+  const landed = await Promise.all(subIssues.map((s) => run(s)));
+  pr = await finishShared(landed);
+  results = landed.map(({ verified: _verified, ...r }) => r);
+} else {
+  results = await Promise.all(
+    subIssues.map(async (s) => {
+      const done = await run(s);
+      return targets.has(s.id) ? address(targets.get(s.id), s.id, done) : done;
+    }),
+  );
+}
 
 let preserveCheck;
 if (plan.preserve && preflight && preflight.browser === 'ready') {
-  const branches = results
-    .filter((r) => (r.status === 'ready' || r.status === 'needs_person') && r.branch)
-    .map((r) => `${r.branch} (${r.prUrl})`);
+  const branches = (shared ? (pr && pr.prUrl ? [pr] : []) : results.filter((r) => OK.has(r.status) && r.branch)).map(
+    (r) => `${r.branch} (${r.prUrl})`,
+  );
   if (branches.length > 0) {
     preserveCheck = await agent(
       `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before.
@@ -426,4 +540,4 @@ Compare each screen that the run touched with origin/${plan.defaultBranch} in a 
   }
 }
 await stopBefore();
-return { delivery: plan.delivery, parent, preserveCheck, results, sharedBranch: shared || undefined };
+return { delivery: plan.delivery, parent, pr, preserveCheck, results, sharedBranch: shared || undefined };
