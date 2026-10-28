@@ -349,7 +349,7 @@ function implementPrompt(s, bases) {
 3. ${build('verified')}
 4. ${CHECKS}${CI_LOCAL}${PRESERVE}${BROWSER_SETUP}
 5. Commit in small logical steps and push the branch. Open no PR: the finish step opens it after the review, so that CI and any review bot see the finished code.
-6. Leave the sub-issue in progress. The address step moves it once CI passes.
+6. Leave the sub-issue in progress. The address step moves it once the PR is addressed.
 7. Return pushed, with verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screens that changed, for the PR's screenshots.
 
 ${OUTSIDE}`;
@@ -391,7 +391,7 @@ Re-verify only what your fixes change: run the test files that cover the files y
 Take the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}
 ${TYPE_CHECK}${ci ? ` As your last checks, also run each other CI check that your fixes can break:\n${ci.checks}\n` : ' '}Fix what it finds, then push.
 Then open the PR, as a draft or ready for review as the project instructions say, and ready for review when they say neither. A draft can hold back CI and a review bot until it is marked ready. ${t.open} Its body follows the repo's PR template, matches the final diff, and holds the test notes and screenshots.
-Leave each issue in its stage. The address step moves it once CI passes.
+Leave each issue in its stage. The address step moves it once the PR is addressed.
 Return ready, with prUrl, when all of this passes. Return needs_person, with prUrl, when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse), and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass, and open no PR.`;
 }
 
@@ -404,8 +404,8 @@ ${t.brief}
 git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
 ${CI_ADDRESS}
 1. Wait until every CI check on the PR has finished, and the review bot's review if one runs. Use gh pr checks ${prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
-2. Use the address-pr skill on the PR: fix each real review comment and failing check, and reply to each comment. Make every fix of the round before you push, then push once, since each push can restart CI, cancel runs still going, and start another bot review. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
-3. After the last push, wait for the checks again the same way. When they pass and no comment is open, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for anything that stays open.`;
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, and reply to each comment. Make every fix of the round before you push, then push once, since each push can restart CI, cancel runs still going, and start another bot review. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec. Do not wait for the checks after the push: the CI run it starts is the user's to follow.
+3. When every comment has a fix or a reply and every failing check has a fix pushed, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for a comment or a check that you could not fix.`;
 }
 
 async function review(t, key) {
