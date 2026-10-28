@@ -27,9 +27,11 @@ const PLAN_SCHEMA = {
       type: 'object',
     },
     preserve: { type: 'boolean' },
+    spec: { type: 'string' },
     subIssues: {
       items: {
         properties: {
+          description: { type: 'string' },
           id: { type: 'string' },
           predecessors: { items: { type: 'string' }, type: 'array' },
           reason: { type: 'string' },
@@ -37,13 +39,13 @@ const PLAN_SCHEMA = {
           title: { type: 'string' },
           url: { type: 'string' },
         },
-        required: ['id', 'title', 'predecessors', 'skip'],
+        required: ['id', 'title', 'description', 'predecessors', 'skip'],
         type: 'object',
       },
       type: 'array',
     },
   },
-  required: ['defaultBranch', 'delivery', 'preserve', 'subIssues'],
+  required: ['defaultBranch', 'delivery', 'preserve', 'spec', 'subIssues'],
   type: 'object',
 };
 
@@ -153,19 +155,21 @@ const LENSES = [
   },
 ];
 
-const TRACKER = `The parent issue is ${parent}. Read it, and its sub-issues, with the issue tracker tools that this session has (an MCP server or a CLI). Follow the tracker conventions in the project instructions, if any.`;
+const TRACKER = `Use the issue tracker tools that this session has (an MCP server or a CLI), and follow the tracker conventions in the project instructions, if any.`;
+const READ = `The parent issue is ${parent}. Read it, and its sub-issues. ${TRACKER}`;
 
 const WORKTREE = `You work in a fresh worktree: install the dependencies before the first build or test. Write files with the file tools, and run one plain command per shell call, since the worktree guard refuses heredocs, loops and shell variables. Give every wait a timeout, and when it runs out, find out why. Before you return, stop each dev server and browser session that you started.`;
 
 phase('Plan');
 const [plan, preflight] = await Promise.all([
   agent(
-    `${TRACKER}
+    `${READ}
 The parent's description is the spec for every sub-issue. Do not change anything.
 
 Return:
+- spec: the parent's description in full, as written.
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
-- subIssues: each sub-issue that is not done, with its id, title and url. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
+- subIssues: each sub-issue that is not done, with its id, title, url, and its description in full, as written. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
 - preserve: true when the spec is a refactor or a migration, that is, it says that existing screens or callers must look and behave as before. Otherwise false.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
 - delivery: how the sub-issues reach the default branch, with the reason.
@@ -174,7 +178,7 @@ Return:
     { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
   ),
   agent(
-    `${TRACKER}
+    `${READ}
 Find out how this repo's app is checked in a real browser, from the project instructions and the docs they point to. Change no code and no tracker item.
 If no sub-issue changes something visible in the app, return not_needed.
 Otherwise start the dev server from this checkout, open the app in a browser session of your own, and confirm that the saved login reaches the app. Find test data on this account that the sub-issues can use: ids that exist and hold the data they need. Then stop the dev server and close the session.
@@ -243,12 +247,19 @@ function label(s) {
   return `${s.id} ${s.title}`;
 }
 
+const SPEC = `The spec, from the description of the parent issue ${parent}:\n${plan.spec}`;
+
+function brief(s) {
+  return `The description of sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}:\n${s.description}\n\n${SPEC}\n\nThe spec and the sub-issue are above, so read neither from the tracker.`;
+}
+
 function implementPrompt(s, bases) {
   const base = bases[0] || root;
   const merges = bases.slice(1);
-  return `${TRACKER}
-Implement sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}. The parent's description is the spec. State the sub-issue title before you start.
+  return `Implement sub-issue ${label(s)}. State its title before you start. ${TRACKER}
 ${WORKTREE}
+
+${brief(s)}
 
 1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.
 2. git fetch, then create branch from origin/${base}.${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
@@ -262,7 +273,9 @@ If the work needs a change outside this repo (a backend endpoint, an API spec, a
 }
 
 function reviewPrompt(s, impl, base, lens) {
-  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}. ${TRACKER}
+  return `Review PR ${impl.prUrl} for sub-issue ${label(s)}.
+${brief(s)}
+
 git fetch, then read the change with git diff origin/${base}...origin/${impl.branch}, and any file at the branch with git show origin/${impl.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
 Report only the ${lens.key} problems: ${lens.focus}
 Read only. Behaviour that the parent spec or the sub-issue asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
@@ -271,6 +284,9 @@ Read only. Behaviour that the parent spec or the sub-issue asks for is the targe
 function finishPrompt(s, impl, findings) {
   return `Finish PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
 ${WORKTREE}
+
+${brief(s)}
+
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and the sub-issue first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 Then make sure the PR meets this rule: ${TESTING}
@@ -280,8 +296,11 @@ Return needs_person when everything passes except checks that a person must set 
 }
 
 function addressPrompt(s, impl) {
-  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}. ${TRACKER}
+  return `Address PR ${impl.prUrl} for sub-issue ${label(s)} on branch ${impl.branch}.
 ${WORKTREE}
+
+${brief(s)}
+
 git fetch, then git switch --detach origin/${impl.branch}. The branch itself stays checked out in the implementer's worktree, so push each commit with git push origin HEAD:${impl.branch}.
 1. Wait until every CI check on the PR has finished, including a review bot that posts comments. Use gh pr checks ${impl.prUrl} --watch with a timeout of at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
 2. Use the address-pr skill on the PR: fix each real review comment and failing check, reply to each comment, and push. Judge each comment against the parent spec and the sub-issue first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec.
@@ -365,8 +384,11 @@ if (plan.preserve && preflight && preflight.browser === 'ready') {
     .map((r) => `${r.branch} (${r.prUrl})`);
   if (branches.length > 0) {
     preserveCheck = await agent(
-      `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before. ${TRACKER}
+      `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before.
 ${WORKTREE}
+
+${SPEC}
+
 git fetch, then create a local branch from origin/${plan.defaultBranch} and merge each of these PR branches into it as origin/<branch>. Never push that merge. Resolve a conflict in the way that keeps both changes.
 ${branches.join('\n')}
 Compare each screen that the run touched with origin/${plan.defaultBranch} in a browser: start the app once from the merge and once from origin/${plan.defaultBranch}. Return each difference that the spec does not name, with the PR that it comes from, in differences. Return an empty list when there is none.${BROWSER_SETUP}`,

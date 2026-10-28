@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 interface SubIssue {
+  description: string;
   id: string;
   title: string;
   predecessors: string[];
@@ -38,7 +39,14 @@ const { constructor: AsyncFunction } = Object.getPrototypeOf(async () => {}) as 
 const script = new AsyncFunction('args', 'agent', 'parallel', 'phase', 'log', source);
 
 function issue(id: string, predecessors: string[] = [], skip = false): SubIssue {
-  return { id, predecessors, skip, title: `title ${id}`, ...(skip ? { reason: 'needs a release' } : {}) };
+  return {
+    description: `DESCRIPTION ${id}`,
+    id,
+    predecessors,
+    skip,
+    title: `title ${id}`,
+    ...(skip ? { reason: 'needs a release' } : {}),
+  };
 }
 
 function defaultReply(label: string): Reply {
@@ -63,7 +71,13 @@ async function runWorkflow(
     calls.push({ label: opts.label, prompt });
     await Promise.resolve();
     if (opts.label === 'plan')
-      return { defaultBranch: 'main', delivery: { mode: 'separate', reason: 'test' }, preserve: false, subIssues };
+      return {
+        defaultBranch: 'main',
+        delivery: { mode: 'separate', reason: 'test' },
+        preserve: false,
+        spec: 'PARENT SPEC',
+        subIssues,
+      };
     if (opts.label === 'preflight') return options.preflight ?? { browser: 'ready', notes: 'PREFLIGHT NOTES' };
     const reply = options.reply?.(opts.label);
     return reply === undefined ? defaultReply(opts.label) : reply;
@@ -196,4 +210,12 @@ test('gives the preflight notes to the implementer and the finisher', async () =
 test('leaves the preflight notes out when no browser check is needed', async () => {
   const run = await runWorkflow([issue('A')], { preflight: { browser: 'not_needed', notes: 'PREFLIGHT NOTES' } });
   assert.doesNotMatch(promptFor(run, 'implement:A'), /PREFLIGHT NOTES/u);
+});
+
+test('gives the spec and the sub-issue description to every agent after the plan', async () => {
+  const run = await runWorkflow([issue('A')]);
+  for (const call of run.calls.filter((c) => !['plan', 'preflight'].includes(c.label))) {
+    assert.match(call.prompt, /PARENT SPEC/u, call.label);
+    assert.match(call.prompt, /DESCRIPTION A/u, call.label);
+  }
 });
