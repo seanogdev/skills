@@ -243,7 +243,7 @@ async function stopBefore() {
   if (!preflight || !preflight.beforePid) return;
   await agent(
     `Stop the dev server with process id ${preflight.beforePid} and its child processes. Then run git worktree remove --force ${preflight.beforeWorktree}. Change nothing else.`,
-    { label: 'stop-before', phase: 'Address' },
+    { effort: 'low', label: 'stop-before', phase: 'Address' },
   );
 }
 
@@ -251,7 +251,7 @@ const shared = plan.delivery.mode === 'shared' && plan.delivery.branch;
 if (shared) {
   const branch = await agent(
     `Make sure the branch ${shared} is on the remote. git fetch. If origin/${shared} exists, use it as it is. Otherwise run git push origin origin/${plan.defaultBranch}:refs/heads/${shared}. Change nothing else. You run in the user's own checkout, so leave its branch and working tree as they are. Return ready when origin/${shared} exists, or blocked with the reason.`,
-    { label: 'shared-branch', phase: 'Plan', schema: BRANCH_SCHEMA },
+    { effort: 'low', label: 'shared-branch', phase: 'Plan', schema: BRANCH_SCHEMA },
   );
   if (!branch || branch.status !== 'ready') {
     const reason = (branch && branch.reason) || 'The shared-branch agent stopped';

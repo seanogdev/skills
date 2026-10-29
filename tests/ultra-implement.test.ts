@@ -13,6 +13,7 @@ interface SubIssue {
 }
 
 interface Call {
+  effort?: string;
   label: string;
   prompt: string;
 }
@@ -72,8 +73,8 @@ async function runWorkflow(
   options: { ci?: Reply; delivery?: Reply; preflight?: Reply; reply?: (label: string) => Reply | undefined } = {},
 ): Promise<Run> {
   const calls: Call[] = [];
-  async function agent(prompt: string, opts: { label: string }) {
-    calls.push({ label: opts.label, prompt });
+  async function agent(prompt: string, opts: { effort?: string; label: string }) {
+    calls.push({ effort: opts.effort, label: opts.label, prompt });
     await Promise.resolve();
     if (opts.label === 'plan')
       return {
@@ -109,10 +110,14 @@ function labels(run: Run) {
   return run.calls.map((c) => c.label).filter((l) => !l.startsWith('review:'));
 }
 
-function promptFor(run: Run, label: string) {
+function callFor(run: Run, label: string) {
   const call = run.calls.find((c) => c.label === label);
   assert.ok(call, `no call labelled ${label}`);
-  return call.prompt;
+  return call;
+}
+
+function promptFor(run: Run, label: string) {
+  return callFor(run, label).prompt;
 }
 
 test('runs a chain in order and stacks each branch on its predecessor', async () => {
@@ -288,6 +293,7 @@ test('shares one before server across the run and stops it at the end', async ()
   assert.match(promptFor(run, 'finish:A'), /BEFORE URL/u);
   assert.equal(labels(run).at(-1), 'stop-before');
   assert.match(promptFor(run, 'stop-before'), /42[\s\S]*BEFORE PATH/u);
+  assert.equal(callFor(run, 'stop-before').effort, 'low');
 });
 
 test('starts a successor before its predecessor is addressed', async () => {
@@ -370,6 +376,7 @@ test('names the shared branch and each slice branch for what they hold', async (
   const run = await runWorkflow([issue('S1')], { delivery: SHARED });
   assert.match(promptFor(run, 'plan'), /not for its first sub-issue/u);
   assert.match(promptFor(run, 'implement:S1'), /Name the branch for this sub-issue/u);
+  assert.equal(callFor(run, 'shared-branch').effort, 'low');
 });
 
 test('leaves out a blocked slice and the slices after it from the combined PR', async () => {
