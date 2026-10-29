@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 `$ARGUMENTS` holds the parent issue. If it is empty, ask for it and stop.
 
-Read `workflow.js` in this skill's directory. Call the Workflow tool with its full contents as `script` and `args` set to `{ "parent": "<the parent issue>" }`. The tool refuses a `scriptPath` outside the working directory. Typing this skill's command is the user's opt-in to the workflow.
+Call the Workflow tool with `scriptPath` set to the absolute path of `workflow.js` in this skill's directory, and `args` set to `{ "parent": "<the parent issue>" }`. The tool loads a `scriptPath` only from a directory that the session can read, such as one with a `Read` allow rule for the skills directory. When it refuses the path, read `workflow.js` and pass its full contents as `script` instead. Typing this skill's command is the user's opt-in to the workflow.
 
 The workflow needs a GitHub remote and the gh CLI. To explain how it works, or to debug a run, read `references/how-it-works.md`.
 
