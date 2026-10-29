@@ -38,6 +38,7 @@ const PLAN_SCHEMA = {
           skip: { type: 'boolean' },
           title: { type: 'string' },
           url: { type: 'string' },
+          visible: { type: 'boolean' },
         },
         required: ['id', 'title', 'criteria', 'predecessors', 'skip'],
         type: 'object',
@@ -195,7 +196,7 @@ The parent's description is the spec for every sub-issue. Do not change anything
 Return:
 - rules: the parts of the spec that bind every sub-issue, each quoted as written: the seams to test at, feature flags, what must not change, and what is out of scope. Leave out user stories, background, and anything that only one sub-issue needs. Every later agent gets these, so keep them short.
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
-- subIssues: each sub-issue that is not done, with its id, title and url. criteria: its acceptance criteria, each quoted as written, or an empty list when it has none. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
+- subIssues: each sub-issue that is not done, with its id, title and url. criteria: its acceptance criteria, each quoted as written, or an empty list when it has none. visible: true when it changes something that a user sees in the app, otherwise false. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
 - preserve: true when the spec is a refactor or a migration, that is, it says that existing screens or callers must look and behave as before. Otherwise false.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
 - delivery: how the sub-issues reach the default branch, with the reason.
@@ -262,6 +263,10 @@ const BROWSER_SETUP =
 const PRESERVE = plan.preserve
   ? ` The spec is a refactor or a migration, so take the before screenshots from origin/${plan.defaultBranch}. Compare before and after for each existing screen that renders a changed part. Fix each difference that the spec does not name.`
   : '';
+function visual(visible) {
+  return visible ? `${PRESERVE}${BROWSER_SETUP}` : '';
+}
+
 const CHECKS = `Test every change. Write automated tests where they fit, at the seams the parent spec names. When the change is visible in the app, also drive it in a real browser and check each acceptance criterion there.`;
 const SCREENSHOTS = `When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
 const BRANCH_NAME = `Name the branch for this sub-issue, in the repo's branch naming convention: follow the project instructions and the recent branches on the remote.`;
@@ -359,7 +364,7 @@ function implementPrompt(s, bases) {
   return `${startPrompt(s)}
 2. git fetch, then create a branch from origin/${base}. ${BRANCH_NAME}${merges.length > 0 ? ` Merge ${merges.map((b) => `origin/${b}`).join(', ')} into it, because this sub-issue also builds on them.` : ''}
 3. ${build('verified')}
-4. ${CHECKS}${CI_LOCAL}${PRESERVE}${BROWSER_SETUP}
+4. ${CHECKS}${CI_LOCAL}${visual(s.visible !== false)}
 5. Commit in small logical steps and push the branch. Open no PR: the finish step opens it after the review, so that CI and any review bot see the finished code.
 6. Leave the sub-issue in progress. The address step moves it once the PR is addressed.
 7. Return pushed, with verified: each acceptance criterion with how you checked it (the test file, or the browser steps), and the screens that changed, for the PR's screenshots.
@@ -371,7 +376,7 @@ function slicePrompt(s) {
   return `${startPrompt(s)}
 2. git fetch, then create a branch from origin/${shared}. ${BRANCH_NAME}
 3. ${build('verified')}
-4. ${CHECKS}${CI_LOCAL}${PRESERVE}${BROWSER_SETUP}
+4. ${CHECKS}${CI_LOCAL}${visual(s.visible !== false)}
 5. Commit in small logical steps. Do not push this branch, and open no PR: one PR takes the shared branch ${shared} to ${plan.defaultBranch} once every sub-issue has landed on it.
 6. Land the sub-issue on the shared branch: git fetch, git merge origin/${shared}, and when the merge brought in changes, run the test files that cover the files that it touched. Then git push origin HEAD:${shared}. Other sub-issues land on it at the same time, so when the push is rejected, repeat this step.
 7. Move the sub-issue to the stage that the project instructions give a sub-issue that lands on a shared branch, then read its stage back from the tracker and return it as stage. Without such an instruction, leave it in progress.
@@ -399,8 +404,7 @@ git fetch, then git switch --detach origin/${t.branch}. Another worktree may hol
 ${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and ${t.issues} first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR body each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 The implementers verified the change like this:
 ${t.verified}
-Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule: ${CHECKS}${BROWSER_SETUP}
-Take the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}
+Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule: ${CHECKS}${t.visible ? `${BROWSER_SETUP}\nTake the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}` : ''}
 ${TYPE_CHECK}${LOCAL_CHECKS ? ` As your last checks, also run each other CI check that your fixes can break:\n${LOCAL_CHECKS}\n` : ' '}Fix what it finds, then push.
 Then open the PR, as a draft or ready for review as the project instructions say, and ready for review when they say neither. A draft can hold back CI and a review bot until it is marked ready. ${t.open} Its body follows the repo's PR template, matches the final diff, and holds the test notes and screenshots.
 Leave each issue in its stage. The address step moves it once the PR is addressed.
@@ -503,6 +507,7 @@ function run(s) {
       name: `sub-issue ${label(s)}`,
       open: `Open it with --head ${impl.branch} --base ${base}, and link the sub-issue the way the project instructions allow.`,
       verified: impl.verified || 'It reported nothing.',
+      visible: s.visible !== false,
     };
     targets.set(s.id, t);
     return { ...summary, ...(await review(t, s.id)) };
@@ -523,6 +528,7 @@ async function finishShared(results) {
     name: `the sub-issues ${landed.map((r) => r.id).join(', ')} on the shared branch`,
     open: `If a PR from ${shared} to ${plan.defaultBranch} is open, use it and update its body. Otherwise open one with --head ${shared} --base ${plan.defaultBranch}. Link each sub-issue the way the project instructions allow.`,
     verified: landed.map((r) => `${r.id}: ${r.verified || 'It reported nothing.'}`).join('\n'),
+    visible: landed.some((r) => byId.get(r.id).visible !== false),
   };
   return address(t, 'shared', await review(t, 'shared'));
 }

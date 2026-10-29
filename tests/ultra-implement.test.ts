@@ -9,6 +9,7 @@ interface SubIssue {
   predecessors: string[];
   skip: boolean;
   reason?: string;
+  visible?: boolean;
 }
 
 interface Call {
@@ -213,6 +214,14 @@ test('gives the preflight notes to the implementer and the finisher', async () =
   const run = await runWorkflow([issue('A')]);
   assert.match(promptFor(run, 'implement:A'), /PREFLIGHT NOTES/u);
   assert.match(promptFor(run, 'finish:A'), /PREFLIGHT NOTES/u);
+});
+
+test('leaves the browser notes and screenshots out for a sub-issue that changes nothing visible', async () => {
+  const run = await runWorkflow([{ ...issue('A'), visible: false }, issue('B')]);
+  for (const label of ['implement:A', 'finish:A'])
+    assert.doesNotMatch(promptFor(run, label), /PREFLIGHT NOTES|Take the screenshots/u, label);
+  assert.match(promptFor(run, 'implement:B'), /PREFLIGHT NOTES/u);
+  assert.match(promptFor(run, 'finish:B'), /PREFLIGHT NOTES[\s\S]*Take the screenshots/u);
 });
 
 test('leaves the preflight notes out when no browser check is needed', async () => {
