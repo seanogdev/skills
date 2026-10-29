@@ -407,6 +407,10 @@ Report only the ${lens.key} problems: ${lens.focus}
 Read only. Behaviour that the parent spec or ${t.issues} asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
 }
 
+function scope(t) {
+  return `One that asks for more than ${t.issues} and the rules ask for, such as a new feature, a wider refactor or a change to code that the PR does not touch, is out of scope: reject it with that reason, unless it is a bug that this change brings in.`;
+}
+
 function finishPrompt(t, findings) {
   return `Finish branch ${t.branch} for ${t.name}, then open its PR. ${TRACKER}
 ${WORKTREE}
@@ -414,7 +418,7 @@ ${WORKTREE}
 ${t.brief}
 
 git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
-${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and ${t.issues} first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. Fix each remaining one that is real. Note in the PR body each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
+${findings.length > 0 ? `Reviewers found these problems. Treat findings that name the same problem as one. Judge each against the parent spec and ${t.issues} first: a finding that would undo behaviour they ask for is rejected. A finding about a change that they do not name is not rejected on the grounds of the spec. ${scope(t)} Fix each remaining one that is real. Note in the PR body each one that you reject, with the reason:\n${JSON.stringify(findings, null, 2)}` : 'Reviewers found no problems.'}
 The implementers verified the change like this:
 ${t.verified}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule: ${CHECKS}${shown(t.slices).length > 0 ? `${browserSetup(shown(t.slices))}\nTake the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}` : ''}
@@ -433,7 +437,7 @@ ${t.brief}
 git fetch, then git switch --detach origin/${t.branch}. Another worktree may hold the branch, so push each commit with git push origin HEAD:${t.branch}.
 ${CI_ADDRESS}
 1. Wait until every CI check on the PR has finished, and the review bot's review if one runs. Use gh pr checks ${prUrl} --watch with the shell tool's timeout set to at most 10 minutes per call, and stop after 60 minutes in all. A check that is still pending then is a failure: return failed with its name.
-2. Use the address-pr skill on the PR: fix each real review comment and failing check, and reply to each comment. Make every fix of the round before you push, then push once, since each push can restart CI, cancel runs still going, and start another bot review. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec. Do not wait for the checks after the push: the CI run it starts is the user's to follow.
+2. Use the address-pr skill on the PR: fix each real review comment and failing check, and reply to each comment. Make every fix of the round before you push, then push once, since each push can restart CI, cancel runs still going, and start another bot review. Judge each comment against the parent spec and ${t.issues} first: a comment that would undo behaviour they ask for is rejected, with the reason in the reply. A comment about a change that they do not name is not rejected on the grounds of the spec. ${scope(t)} Do not wait for the checks after the push: the CI run it starts is the user's to follow.
 3. When every comment has a fix or a reply and every failing check has a fix pushed, ${move ? `${t.move}, then read its stage back from the tracker and return it as stage` : 'leave each issue in its stage, since checks that need a person are still open'}, and return addressed. Return failed, with the reason, for a comment or a check that you could not fix.`;
 }
 

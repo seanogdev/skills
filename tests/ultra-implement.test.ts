@@ -448,6 +448,18 @@ test('falls back to a generic CI brief when the CI agent stops', async () => {
   assert.match(promptFor(run, 'address:A'), /Wait for a review bot that posts comments too/u);
 });
 
+test('rejects review feedback that asks for more than the sub-issue', async () => {
+  const run = await runWorkflow([issue('A')], {
+    reply: (label) => (label === 'review:design:A' ? { findings: [{ file: 'x.ts', problem: 'P' }] } : undefined),
+  });
+  for (const label of ['finish:A', 'address:A'])
+    assert.match(
+      promptFor(run, label),
+      /asks for more than the sub-issue and the rules ask for[\s\S]*is out of scope/u,
+      label,
+    );
+});
+
 test('pushes the address fixes once per round', async () => {
   const run = await runWorkflow([issue('A')]);
   assert.match(promptFor(run, 'address:A'), /Make every fix of the round before you push, then push once/u);
