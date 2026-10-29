@@ -87,6 +87,7 @@ const CI_SCHEMA = {
   properties: {
     checks: { type: 'string' },
     humanReview: { type: 'string' },
+    localChecks: { type: 'string' },
     reviewBot: { enum: ['none', 'on_open', 'on_push', 'on_request'] },
     reviewBotNotes: { type: 'string' },
     typeCheck: { type: 'string' },
@@ -216,6 +217,7 @@ Return ready, with notes on how to start the dev server and find its port, how t
 Read the CI config (such as .github/workflows), CODEOWNERS, the project instructions, and the branch protection of the remote default branch (gh api repos/{owner}/{repo}/branches/<branch>/protection, which may be refused). Then look at the last five merged PRs with gh pr list --state merged, gh pr checks and gh pr view --comments, to see which checks and reviewers actually turn up.
 Return:
 - checks: each check that runs on a PR, its trigger, roughly how long it takes, and the local command that reproduces it. Say which checks run only for some paths, some labels, or a PR to the default branch, so that a PR to another branch skips them.
+- localChecks: the local command of each check, one per line, with what it checks in a few words, and nothing else. Leave out the type check.
 - reviewBot: on_open when a bot reviews a PR by itself only when it opens or leaves draft, on_push when it reviews again after each push, on_request when it reviews only when asked (a label or a comment), none when no bot reviews. reviewBotNotes: its name, how it posts (a review, inline comments or a summary comment), whether it skips drafts, and how to ask it for another review.
 - typeCheck: the command for the type check, or for the build that stands in for one. Leave it empty when the repo has neither.
 - humanReview: the approvals that a merge needs, and who owns which paths.`,
@@ -264,8 +266,9 @@ const CHECKS = `Test every change. Write automated tests where they fit, at the 
 const SCREENSHOTS = `When the UI changed, take before and after screenshots and attach them to the PR body, the way the project instructions say to attach images.`;
 const BRANCH_NAME = `Name the branch for this sub-issue, in the repo's branch naming convention: follow the project instructions and the recent branches on the remote.`;
 const OUTSIDE = `If the work needs a change outside this repo (a backend endpoint, an API spec, another service), do not make it. Return blocked, with what is missing.`;
-const CI_LOCAL = ci
-  ? ` Before you push, run locally each CI check that your change can break, apart from the type check. The CI checks, found at the start of this run:\n${ci.checks}`
+const LOCAL_CHECKS = ci && (ci.localChecks || ci.checks);
+const CI_LOCAL = LOCAL_CHECKS
+  ? ` Before you push, run locally each CI check that your change can break, apart from the type check. The local commands of the CI checks, found at the start of this run:\n${LOCAL_CHECKS}`
   : '';
 const BOT = {
   none: 'No review bot runs on this repo, so address the review comments that are there.',
@@ -276,7 +279,7 @@ const BOT = {
     'The review bot reviews only when asked. Do not wait for it, and do not ask it: the user decides when to spend a review.',
 };
 const CI_ADDRESS = ci
-  ? `CI on this repo, found at the start of this run:\n${ci.checks}\nReview bot: ${BOT[ci.reviewBot] || BOT.on_open}${ci.reviewBotNotes ? ` ${ci.reviewBotNotes}` : ''}\nDo not wait for a human review: the user handles it.`
+  ? `gh pr checks lists the CI checks of the PR.${LOCAL_CHECKS ? ` To reproduce a failing one locally:\n${LOCAL_CHECKS}` : ''}\nReview bot: ${BOT[ci.reviewBot] || BOT.on_open}${ci.reviewBotNotes ? ` ${ci.reviewBotNotes}` : ''}\nDo not wait for a human review: the user handles it.`
   : 'Wait for a review bot that posts comments too, if one runs. Do not wait for a human review: the user handles it.';
 const TYPE_CHECK =
   ci && !ci.typeCheck
@@ -398,7 +401,7 @@ The implementers verified the change like this:
 ${t.verified}
 Re-verify only what your fixes change: run the test files that cover the files you changed. When a fix changes something visible, or the report leaves an acceptance criterion unchecked, check it under this rule: ${CHECKS}${BROWSER_SETUP}
 Take the screenshots from the final code, for the screens that the implementers named and the ones your fixes change. ${SCREENSHOTS}${PRESERVE}
-${TYPE_CHECK}${ci ? ` As your last checks, also run each other CI check that your fixes can break:\n${ci.checks}\n` : ' '}Fix what it finds, then push.
+${TYPE_CHECK}${LOCAL_CHECKS ? ` As your last checks, also run each other CI check that your fixes can break:\n${LOCAL_CHECKS}\n` : ' '}Fix what it finds, then push.
 Then open the PR, as a draft or ready for review as the project instructions say, and ready for review when they say neither. A draft can hold back CI and a review bot until it is marked ready. ${t.open} Its body follows the repo's PR template, matches the final diff, and holds the test notes and screenshots.
 Leave each issue in its stage. The address step moves it once the PR is addressed.
 Return ready, with prUrl, when all of this passes. Return needs_person, with prUrl, when everything passes except checks that a person must set up first (test data the account lacks, an account setting, an action the permissions refuse), and name each open check and what it needs in reason. Return failed, with the reason, for anything else that does not pass, and open no PR.`;

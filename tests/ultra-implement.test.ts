@@ -381,21 +381,25 @@ test('fails a sub-issue whose finisher opens no PR', async () => {
   assert.ok(!labels(run).includes('address:A'));
 });
 
-test('gives the CI checks to the implementer and the finisher, and the review bot to the addresser', async () => {
+test('gives only the local check commands to the implementer, the finisher and the addresser', async () => {
   const run = await runWorkflow([issue('A')], {
     ci: {
       checks: 'CI CHECKS',
       humanReview: 'one approval',
+      localChecks: 'LOCAL CMDS',
       reviewBot: 'on_push',
       reviewBotNotes: 'BOT NOTES',
       typeCheck: 'TYPECHECK CMD',
     },
   });
-  assert.match(promptFor(run, 'implement:A'), /Before you push, run locally[\s\S]*CI CHECKS/u);
+  assert.match(promptFor(run, 'implement:A'), /Before you push, run locally[\s\S]*LOCAL CMDS/u);
   assert.match(
     promptFor(run, 'finish:A'),
-    /Run the type check \(TYPECHECK CMD\) once, as the last check[\s\S]*CI CHECKS/u,
+    /Run the type check \(TYPECHECK CMD\) once, as the last check[\s\S]*LOCAL CMDS/u,
   );
+  for (const label of ['implement:A', 'finish:A', 'address:A'])
+    assert.doesNotMatch(promptFor(run, label), /CI CHECKS/u, label);
+  assert.match(promptFor(run, 'address:A'), /reproduce a failing one locally:\nLOCAL CMDS/u);
   assert.match(promptFor(run, 'address:A'), /reviews again after each push[\s\S]*BOT NOTES/u);
   assert.match(promptFor(run, 'address:A'), /Do not wait for a human review/u);
 });
