@@ -26,7 +26,7 @@ interface Summary {
 
 interface Run {
   calls: Call[];
-  result: { pr?: Summary & { prUrl?: string; stage?: string }; results: Summary[] };
+  result: { gaps?: unknown[]; pr?: Summary & { prUrl?: string; stage?: string }; results: Summary[] };
 }
 
 type Reply = Record<string, unknown> | null;
@@ -133,7 +133,8 @@ test('runs a chain in order and stacks each branch on its predecessor', async ()
     ['finish:C', 'address:C'],
   ])
     assert.ok(order.indexOf(first) < order.indexOf(then), `${first} before ${then}`);
-  assert.equal(order.length, 12);
+  assert.equal(order.length, 13);
+  assert.equal(order.at(-1), 'completeness');
   assert.match(promptFor(run, 'implement:A'), /origin\/main/u);
   assert.match(promptFor(run, 'implement:B'), /origin\/branch-A/u);
   assert.match(promptFor(run, 'finish:B'), /--base branch-A/u);
@@ -251,9 +252,9 @@ test('leaves the preflight notes out when no browser check is needed', async () 
   assert.doesNotMatch(promptFor(run, 'implement:A'), /PREFLIGHT NOTES/u);
 });
 
-test('gives every agent after the plan the criteria and rules, and points it at the full spec', async () => {
+test('gives every agent that builds or reviews the criteria and rules, and points it at the full spec', async () => {
   const run = await runWorkflow([issue('A')]);
-  for (const call of run.calls.filter((c) => !['plan', 'preflight', 'ci'].includes(c.label))) {
+  for (const call of run.calls.filter((c) => !['plan', 'preflight', 'ci', 'completeness'].includes(c.label))) {
     assert.match(call.prompt, /CRITERION A/u, call.label);
     assert.match(call.prompt, /- RULE/u, call.label);
     assert.match(call.prompt, /Read them only when the criteria and rules above leave a question open/u, call.label);
@@ -337,6 +338,27 @@ test('leaves a sub-issue that needs a person in progress after the address step'
   assert.match(promptFor(run, 'address:A'), /leave each issue in its stage/u);
 });
 
+test('checks every PR against the spec at the end, and returns the gaps', async () => {
+  const run = await runWorkflow([issue('A'), issue('B', ['A']), issue('C', [], true)], {
+    reply: (label) => (label === 'completeness' ? { gaps: [{ gap: 'no export', story: 'STORY' }] } : undefined),
+  });
+  const prompt = promptFor(run, 'completeness');
+  assert.match(prompt, /Read only/u);
+  assert.match(prompt, /branch-A into main \(pr-A\): A/u);
+  assert.match(prompt, /branch-B into branch-A \(pr-B\): B/u);
+  assert.match(prompt, /not delivered[\s\S]*- C title C: skipped/u);
+  assert.doesNotMatch(prompt, /VERIFIED/u);
+  assert.deepEqual(run.result.gaps, [{ gap: 'no export', story: 'STORY' }]);
+});
+
+test('skips the completeness check when no PR opened', async () => {
+  const run = await runWorkflow([issue('A')], {
+    reply: (label) => (label === 'implement:A' ? { reason: 'no endpoint', status: 'blocked' } : undefined),
+  });
+  assert.ok(!labels(run).includes('completeness'));
+  assert.equal(run.result.gaps, undefined);
+});
+
 const SHARED = { branch: 'checkout', mode: 'shared', reason: 'one thing' };
 
 test('lands every slice on the shared branch and opens one PR for them', async () => {
@@ -370,6 +392,7 @@ test('reviews the combined PR once with every slice in the brief', async () => {
   }
   assert.match(promptFor(run, 'finish:shared'), /VERIFIED S1[\s\S]*VERIFIED S2/u);
   assert.match(promptFor(run, 'address:shared'), /move the parent issue PARENT to the in-review stage/u);
+  assert.match(promptFor(run, 'completeness'), /checkout into main \(pr-shared\): S1, S2/u);
 });
 
 test('names the shared branch and each slice branch for what they hold', async () => {

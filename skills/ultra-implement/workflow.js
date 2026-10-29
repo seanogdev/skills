@@ -164,6 +164,25 @@ const PRESERVE_SCHEMA = {
   type: 'object',
 };
 
+const GAPS_SCHEMA = {
+  properties: {
+    gaps: {
+      items: {
+        properties: {
+          gap: { type: 'string' },
+          issue: { type: 'string' },
+          story: { type: 'string' },
+        },
+        required: ['story', 'gap'],
+        type: 'object',
+      },
+      type: 'array',
+    },
+  },
+  required: ['gaps'],
+  type: 'object',
+};
+
 const LENSES = [
   {
     focus:
@@ -565,14 +584,14 @@ if (shared) {
   );
 }
 
-let preserveCheck;
-if (plan.preserve && preflight && preflight.browser === 'ready') {
+async function checkPreserve() {
+  if (!plan.preserve || !preflight || preflight.browser !== 'ready') return;
   const branches = (shared ? (pr && pr.prUrl ? [pr] : []) : results.filter((r) => OK.has(r.status) && r.branch)).map(
     (r) => `${r.branch} (${r.prUrl})`,
   );
-  if (branches.length > 0) {
-    preserveCheck = await agent(
-      `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before.
+  if (branches.length === 0) return;
+  return agent(
+    `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before.
 ${WORKTREE}
 
 Read the spec, the description of ${parent}, from the tracker. ${TRACKER}
@@ -580,9 +599,44 @@ Read the spec, the description of ${parent}, from the tracker. ${TRACKER}
 git fetch, then create a local branch from origin/${plan.defaultBranch} and merge each of these PR branches into it as origin/<branch>. Never push that merge. Resolve a conflict in the way that keeps both changes.
 ${branches.join('\n')}
 Compare each screen that the run touched with origin/${plan.defaultBranch} in a browser: start the app from the merge, and ${before ? `use the before server at ${before} for origin/${plan.defaultBranch}` : `once from origin/${plan.defaultBranch}`}. Return each difference that the spec does not name, with the PR that it comes from, in differences. Return an empty list when there is none.${browserSetup(subIssues)}`,
-      { isolation: 'worktree', label: 'preserve-check', phase: 'Finish', schema: PRESERVE_SCHEMA },
-    );
-  }
+    { isolation: 'worktree', label: 'preserve-check', phase: 'Finish', schema: PRESERVE_SCHEMA },
+  );
 }
+
+async function checkCompleteness() {
+  const prs = shared
+    ? pr && pr.prUrl
+      ? [
+          `${shared} into ${plan.defaultBranch} (${pr.prUrl}): ${results
+            .filter((r) => r.status === 'landed')
+            .map((r) => r.id)
+            .join(', ')}`,
+        ]
+      : []
+    : results
+        .filter((r) => r.prUrl && targets.has(r.id))
+        .map((r) => `${r.branch} into ${targets.get(r.id).base} (${r.prUrl}): ${r.id}`);
+  if (prs.length === 0) return;
+  const missing = results.filter((r) => !OK.has(r.status)).map((r) => `- ${r.id} ${r.title}: ${r.status}`);
+  return agent(
+    `Check what this run delivered against the spec of ${parent}. Read only. ${TRACKER}
+Read the spec, the description of ${parent}, from the tracker, with its user stories and acceptance criteria. Then git fetch, and read what each PR delivers with git diff origin/<base>...origin/<branch>, and any file at the branch with git show origin/<branch>:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
+The PRs of this run, each as branch into base (PR): sub-issues:
+${prs.join('\n')}${missing.length > 0 ? `\nThese sub-issues were not delivered, and the report lists them already, so leave out what only they cover:\n${missing.join('\n')}` : ''}
+Return in gaps each user story or requirement of the spec that no PR delivers, or delivers only in part: the story as written, what is missing, and the sub-issue that should have delivered it, if one does. A story that no sub-issue covers is a gap too. Return an empty list when nothing is missing.`,
+    { label: 'completeness', phase: 'Finish', schema: GAPS_SCHEMA },
+  );
+}
+
+const [preserveCheck, completeness] = await Promise.all([checkPreserve(), checkCompleteness()]);
 await stopBefore();
-return { ci, delivery: plan.delivery, parent, pr, preserveCheck, results, sharedBranch: shared || undefined };
+return {
+  ci,
+  delivery: plan.delivery,
+  gaps: completeness ? completeness.gaps : undefined,
+  parent,
+  pr,
+  preserveCheck,
+  results,
+  sharedBranch: shared || undefined,
+};
