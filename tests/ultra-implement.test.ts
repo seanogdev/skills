@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 interface SubIssue {
-  description: string;
+  criteria: string[];
   id: string;
   title: string;
   predecessors: string[];
@@ -40,7 +40,7 @@ const script = new AsyncFunction('args', 'agent', 'parallel', 'phase', 'log', so
 
 function issue(id: string, predecessors: string[] = [], skip = false): SubIssue {
   return {
-    description: `DESCRIPTION ${id}`,
+    criteria: [`CRITERION ${id}`],
     id,
     predecessors,
     skip,
@@ -79,7 +79,7 @@ async function runWorkflow(
         defaultBranch: 'main',
         delivery: options.delivery ?? { mode: 'separate', reason: 'test' },
         preserve: false,
-        spec: 'PARENT SPEC',
+        rules: ['RULE'],
         subIssues,
       };
     if (opts.label === 'ci')
@@ -220,12 +220,27 @@ test('leaves the preflight notes out when no browser check is needed', async () 
   assert.doesNotMatch(promptFor(run, 'implement:A'), /PREFLIGHT NOTES/u);
 });
 
-test('gives the spec and the sub-issue description to every agent after the plan', async () => {
+test('gives every agent after the plan the criteria and rules, and points it at the full spec', async () => {
   const run = await runWorkflow([issue('A')]);
   for (const call of run.calls.filter((c) => !['plan', 'preflight', 'ci'].includes(c.label))) {
-    assert.match(call.prompt, /PARENT SPEC/u, call.label);
-    assert.match(call.prompt, /DESCRIPTION A/u, call.label);
+    assert.match(call.prompt, /CRITERION A/u, call.label);
+    assert.match(call.prompt, /- RULE/u, call.label);
+    assert.match(call.prompt, /Read them only when the criteria and rules above leave a question open/u, call.label);
   }
+});
+
+test('has only the implementer and the spec reviewer read the sub-issue or the spec up front', async () => {
+  const run = await runWorkflow([issue('A')]);
+  assert.match(promptFor(run, 'implement:A'), /Read the sub-issue's description from the tracker/u);
+  assert.match(promptFor(run, 'review:spec:A'), /Read the parent spec and the descriptions/u);
+  for (const label of ['review:correctness:A', 'review:design:A', 'finish:A', 'address:A'])
+    assert.doesNotMatch(promptFor(run, label), /Read the parent spec and the descriptions/u, label);
+  assert.match(promptFor(run, 'preflight'), /not the parent's description/u);
+});
+
+test('points a sub-issue with no criteria at its description and the spec', async () => {
+  const run = await runWorkflow([{ ...issue('A'), criteria: [] }]);
+  assert.match(promptFor(run, 'finish:A'), /It has none, so read its description and the parent spec/u);
 });
 
 test('gives the verification of the implementer to the finisher', async () => {
@@ -318,7 +333,7 @@ test('reviews the combined PR once with every slice in the brief', async () => {
   const reviews = run.calls.map((c) => c.label).filter((l) => l.startsWith('review:'));
   assert.deepEqual(reviews.toSorted(), ['review:correctness:shared', 'review:design:shared', 'review:spec:shared']);
   for (const step of ['review:spec:shared', 'finish:shared', 'address:shared']) {
-    assert.match(promptFor(run, step), /DESCRIPTION S1[\s\S]*DESCRIPTION S2/u, step);
+    assert.match(promptFor(run, step), /CRITERION S1[\s\S]*CRITERION S2/u, step);
     assert.match(promptFor(run, step), /origin\/checkout/u, step);
   }
   assert.match(promptFor(run, 'finish:shared'), /VERIFIED S1[\s\S]*VERIFIED S2/u);
@@ -337,8 +352,8 @@ test('leaves out a blocked slice and the slices after it from the combined PR', 
     reply: (label) => (label === 'implement:S1' ? { reason: 'no endpoint', status: 'blocked' } : undefined),
   });
   assert.deepEqual(statuses(run), { S1: 'blocked', S2: 'blocked', S3: 'landed' });
-  assert.doesNotMatch(promptFor(run, 'finish:shared'), /DESCRIPTION S1/u);
-  assert.match(promptFor(run, 'finish:shared'), /DESCRIPTION S3/u);
+  assert.doesNotMatch(promptFor(run, 'finish:shared'), /CRITERION S1/u);
+  assert.match(promptFor(run, 'finish:shared'), /CRITERION S3/u);
 });
 
 test('opens no PR when no slice lands', async () => {

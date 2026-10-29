@@ -27,11 +27,11 @@ const PLAN_SCHEMA = {
       type: 'object',
     },
     preserve: { type: 'boolean' },
-    spec: { type: 'string' },
+    rules: { items: { type: 'string' }, type: 'array' },
     subIssues: {
       items: {
         properties: {
-          description: { type: 'string' },
+          criteria: { items: { type: 'string' }, type: 'array' },
           id: { type: 'string' },
           predecessors: { items: { type: 'string' }, type: 'array' },
           reason: { type: 'string' },
@@ -39,13 +39,13 @@ const PLAN_SCHEMA = {
           title: { type: 'string' },
           url: { type: 'string' },
         },
-        required: ['id', 'title', 'description', 'predecessors', 'skip'],
+        required: ['id', 'title', 'criteria', 'predecessors', 'skip'],
         type: 'object',
       },
       type: 'array',
     },
   },
-  required: ['defaultBranch', 'delivery', 'preserve', 'spec', 'subIssues'],
+  required: ['defaultBranch', 'delivery', 'preserve', 'rules', 'subIssues'],
   type: 'object',
 };
 
@@ -169,6 +169,7 @@ const LENSES = [
     focus:
       'Each acceptance criterion of the sub-issues in the PR and each rule of the parent spec that applies to it: met, missed, or done differently without a reason.',
     key: 'spec',
+    read: 'Read the parent spec and the descriptions of the sub-issues in the PR from the tracker first, and check the user stories that they give this change too.',
   },
 ];
 
@@ -191,9 +192,9 @@ const [plan, preflight, ci] = await Promise.all([
 The parent's description is the spec for every sub-issue. Do not change anything.
 
 Return:
-- spec: the parent's description in full, as written.
+- rules: the parts of the spec that bind every sub-issue, each quoted as written: the seams to test at, feature flags, what must not change, and what is out of scope. Leave out user stories, background, and anything that only one sub-issue needs. Every later agent gets these, so keep them short.
 - defaultBranch: the remote default branch (git symbolic-ref refs/remotes/origin/HEAD).
-- subIssues: each sub-issue that is not done, with its id, title, url, and its description in full, as written. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
+- subIssues: each sub-issue that is not done, with its id, title and url. criteria: its acceptance criteria, each quoted as written, or an empty list when it has none. predecessors lists the ids of the open sub-issues in this list that must be done first, from the tracker's dependency links. Drop links to done or outside issues.
 - preserve: true when the spec is a refactor or a migration, that is, it says that existing screens or callers must look and behave as before. Otherwise false.
 - skip: true, with a reason, for a sub-issue that needs a person: a release, a product sign-off, or a decision that the spec leaves open.
 - delivery: how the sub-issues reach the default branch, with the reason.
@@ -202,7 +203,7 @@ Return:
     { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA },
   ),
   agent(
-    `${READ}
+    `The parent issue is ${parent}. Read the titles and acceptance criteria of its sub-issues, not the parent's description. ${TRACKER}
 Find out how this repo's app is checked in a real browser, from the project instructions and the docs they point to. Change no code and no tracker item.
 If no sub-issue changes something visible in the app, return not_needed.
 Otherwise start the dev server from this checkout, open the app in a browser session of your own, and confirm that the saved login reaches the app. Find test data on this account that the sub-issues can use: ids that exist and hold the data they need. Then stop the dev server and close the session.
@@ -314,18 +315,26 @@ function label(s) {
   return `${s.id} ${s.title}`;
 }
 
-const SPEC = `The spec, from the description of the parent issue ${parent}:\n${plan.spec}`;
+const RULES =
+  plan.rules.length > 0
+    ? `\n\nRules from the parent spec for every sub-issue:\n${plan.rules.map((r) => `- ${r}`).join('\n')}`
+    : '';
+const MORE = `The full spec is the description of the parent issue ${parent}, and each sub-issue's full description is in the tracker. Read them only when the criteria and rules above leave a question open.`;
 
-function describe(s) {
-  return `The description of sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}:\n${s.description}`;
+function criteria(s) {
+  const list =
+    s.criteria.length > 0
+      ? s.criteria.map((c) => `- ${c}`).join('\n')
+      : '- It has none, so read its description and the parent spec for what it must do.';
+  return `The acceptance criteria of sub-issue ${label(s)}${s.url ? ` (${s.url})` : ''}:\n${list}`;
 }
 
 function brief(s) {
-  return `${describe(s)}\n\n${SPEC}\n\nThe spec and the sub-issue are above, so read neither from the tracker.`;
+  return `${criteria(s)}${RULES}\n\n${MORE}`;
 }
 
 function sharedBrief(slices) {
-  return `${slices.map((s) => describe(s)).join('\n\n')}\n\n${SPEC}\n\nThe spec and the sub-issues are above, so read none of them from the tracker.`;
+  return `${slices.map((s) => criteria(s)).join('\n\n')}${RULES}\n\n${MORE}`;
 }
 
 function startPrompt(s) {
@@ -334,7 +343,7 @@ ${WORKTREE}
 
 ${brief(s)}
 
-1. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.`;
+1. Read the sub-issue's description from the tracker. Move the sub-issue to the in-progress stage, then read its stage back from the tracker. If it is not in progress, stop and return failed.`;
 }
 
 function build(where) {
@@ -372,7 +381,7 @@ function reviewPrompt(t, lens) {
   return `Review branch ${t.branch} for ${t.name}. It has no PR yet.
 ${t.brief}
 
-git fetch, then read the change with git diff origin/${t.base}...origin/${t.branch}, and any file at the branch with git show origin/${t.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.
+git fetch, then read the change with git diff origin/${t.base}...origin/${t.branch}, and any file at the branch with git show origin/${t.branch}:<path>. You run in the user's own checkout, so leave its branch and working tree as they are.${lens.read ? ` ${lens.read} ${TRACKER}` : ''}
 Report only the ${lens.key} problems: ${lens.focus}
 Read only. Behaviour that the parent spec or ${t.issues} asks for is the target. A change to existing callers or screens that they do not name is a finding. Report a finding only when you can name the input or state that breaks, or the rule it breaks. Return an empty list when there is none.`;
 }
@@ -540,7 +549,7 @@ if (plan.preserve && preflight && preflight.browser === 'ready') {
       `The spec of ${parent} is a refactor or a migration: existing screens must look and behave as before.
 ${WORKTREE}
 
-${SPEC}
+Read the spec, the description of ${parent}, from the tracker. ${TRACKER}
 
 git fetch, then create a local branch from origin/${plan.defaultBranch} and merge each of these PR branches into it as origin/<branch>. Never push that merge. Resolve a conflict in the way that keeps both changes.
 ${branches.join('\n')}
