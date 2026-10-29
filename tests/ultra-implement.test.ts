@@ -224,6 +224,23 @@ test('leaves the browser notes and screenshots out for a sub-issue that changes 
   assert.match(promptFor(run, 'finish:B'), /PREFLIGHT NOTES[\s\S]*Take the screenshots/u);
 });
 
+test('gives each sub-issue only its own test data', async () => {
+  const run = await runWorkflow([issue('A'), issue('B')], {
+    preflight: {
+      browser: 'ready',
+      notes: 'PREFLIGHT NOTES',
+      testData: [
+        { data: 'DATA A', id: 'A' },
+        { data: 'DATA B', id: 'B' },
+      ],
+    },
+  });
+  for (const label of ['implement:A', 'finish:A']) {
+    assert.match(promptFor(run, label), /- A: DATA A/u, label);
+    assert.doesNotMatch(promptFor(run, label), /DATA B/u, label);
+  }
+});
+
 test('leaves the preflight notes out when no browser check is needed', async () => {
   const run = await runWorkflow([issue('A')], { preflight: { browser: 'not_needed', notes: 'PREFLIGHT NOTES' } });
   assert.doesNotMatch(promptFor(run, 'implement:A'), /PREFLIGHT NOTES/u);
