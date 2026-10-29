@@ -12,7 +12,7 @@ Call the Workflow tool with `scriptPath` set to the absolute path of `workflow.j
 
 The workflow needs a GitHub remote and the gh CLI. To explain how it works, or to debug a run, read `references/how-it-works.md`.
 
-Before a resume of a run, remove that run's worktrees and local branches that have no changes, since old worktree paths block the new ones.
+To resume a stopped or failed run in the same session, call the Workflow tool with the same `scriptPath`, or the one that the first call returned when it passed `script`, the same `args`, and `resumeFromRunId` set to its run id. Agents before the first one that failed or whose prompt changed return their saved results, and that one and every agent after it run again. Before a resume, remove that run's worktrees and local branches that have no changes, since old worktree paths block the new ones.
 
 For an unattended run, start the session in auto permission mode, then send it to the background.
 
