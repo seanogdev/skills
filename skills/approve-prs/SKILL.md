@@ -4,99 +4,90 @@ description: List open PRs awaiting your review, or one user's open PRs in a rep
 license: MIT
 argument-hint: '[username] [owner/repo]'
 disable-model-invocation: true
-allowed-tools: Bash(gh search prs*), Bash(gh pr list*), Bash(gh pr view*), Bash(gh pr diff*), Bash(gh repo view*), Bash(gh pr review*)
+allowed-tools: Bash(node *approve-prs/scripts/*), Bash(gh pr diff*), Bash(mktemp -d*)
 ---
 
 # Approve PRs
 
+Each `scripts/` path is relative to the directory that holds this file. Expand it to a full path
+before you run it. Keep every working file in one directory from `mktemp -d`, called `$DIR` below.
+
 Arguments from the user: `$ARGUMENTS`
 
-## 1. Find the PRs
+## 1. Fetch
 
-- **No arguments**: every open PR where your review is requested, across all repos:
+```bash
+node scripts/fetch.ts $ARGUMENTS > "$DIR/prs.json"
+```
 
-  ```bash
-  gh search prs --review-requested=@me --state=open --limit 50 --json number,title,repository,author,isDraft,url
-  ```
-
-- **A username**: that user's open PRs in one repo. The repo is the second argument, or the current
-  checkout's repo when there is none:
-
-  ```bash
-  gh pr list --author <username> --state open --limit 50 -R <owner/repo> --json number,title,author,isDraft,url
-  ```
-
-  Without a second argument, resolve the repo with `gh repo view --json nameWithOwner`.
+With no arguments it lists every open PR where your review is requested, across all repos. With a
+username it lists that user's open PRs in the repo given as the second argument, or in the current
+checkout's repo. Each entry carries an `id` (`owner/repo#number`), size, files, body, `isOwn`,
+`isDraft`, a `baseRisk` from 1 to 5, and the `signals` behind it.
 
 If the list is empty, say so and stop.
 
-## 2. Assess each PR
+## 2. Assess
 
-For every PR, run `gh pr view <number> -R <owner/repo> --json body,additions,deletions,changedFiles,files`
-and read `gh pr diff <number> -R <owner/repo>`. For a diff over about 1,500 lines, read the file list
-and the riskiest files instead of the whole diff. Run independent PRs in parallel.
+Read each PR's diff with `gh pr diff <number> -R <owner/repo>`, in parallel. For a diff over about
+1,500 lines, read the riskiest files rather than all of it.
 
-Give each PR:
+Write `$DIR/assessments.json`, keyed by `id`:
 
-- **Summary**: what the PR does, in 20 characters or fewer, counted including spaces, e.g.
-  `Fix login redirect`. Judge it from the diff, not just the title.
-- **Risk**: an integer from 1 to 5, with a reason of a few words.
+```json
+{ "owner/repo#123": { "summary": "Fix login redirect", "risk": 3, "reason": "touches auth redirect" } }
+```
 
-| Risk | Meaning                                                                                                                  |
-| ---- | ------------------------------------------------------------------------------------------------------------------------ |
-| 1    | Docs, comments, copy, tests only, or config with no runtime effect.                                                      |
-| 2    | Small, local code change behind clear boundaries, covered by tests.                                                      |
-| 3    | Moderate logic change, or a change to shared code with several callers.                                                  |
-| 4    | Touches auth, payments, permissions, data migrations, public APIs, or dependencies; or a large change with thin tests.   |
-| 5    | Irreversible data change, security-sensitive change, infrastructure or deploy change, or a large cross-cutting refactor. |
-
-Raise the rating one step when the PR has no tests for changed behaviour. Flag drafts.
-
-Move on once every PR has a summary within the limit and a rating with its reason.
+- **summary**: what the PR does, judged from the diff, in 20 characters or fewer.
+- **risk**: `baseRisk`, or one step either side of it when the diff shows what the file paths can't:
+  a trivial edit in a file that only sounds sensitive moves down, a behaviour change to widely shared
+  code moves up.
+- **reason**: a few words on why.
 
 ## 3. Show the list
 
-Print a table, ordered by risk ascending:
-
-| PR  | Repo | Title | Summary | Risk | Size |
-| --- | ---- | ----- | ------- | ---- | ---- |
-
-`PR` links the number to its URL. `Size` is `+additions/-deletions`. Mark drafts in the title.
-
-## 4. Ask which PRs to act on
-
-Use `AskUserQuestion` with `multiSelect: true`. One question holds up to 4 PRs, and one call holds up
-to 4 questions, so a call covers 16 PRs. For more, ask again with the rest.
-
-- **Question**: `Which PRs do you want to act on? (<first>-<last> of <total>)`.
-- **Option label**: `#<number> <summary>`.
-- **Option description**: `<owner/repo> · risk <n>/5 · <title>`.
-
-Then, in one more `AskUserQuestion` call, ask one single-select question per chosen PR (4 per call):
-
-- **Question**: `What do you want to do with #<number> <summary>?`
-- **Options**: `Approve`, `Approve with comment`, `Comment only`.
-
-For `Approve with comment` or `Comment only`, the comment text is the user's notes on that answer, or
-the text they typed under "Other". When neither carries text, ask for the comment in chat before
-posting.
-
-## 5. Post the reviews
-
-Your selections are the confirmation. Post each one:
-
 ```bash
-gh pr review <number> -R <owner/repo> --approve
-gh pr review <number> -R <owner/repo> --approve --body '<comment>'
-gh pr review <number> -R <owner/repo> --comment --body '<comment>'
+node scripts/render.ts "$DIR/prs.json" "$DIR/assessments.json"
 ```
 
-Post the comment word for word, as the user wrote it. Use a heredoc for a body with quotes or
-newlines.
+When it fails on an assessment, fix `assessments.json` and rerun. On success, show the user the
+table it prints, as is.
 
-GitHub refuses an approval on your own PR. Report that refusal and carry on with the rest.
+## 4. Ask
+
+The output ends with a JSON array of `AskUserQuestion` calls. Make each call with its questions
+exactly as given. An empty array means there is only one PR: go straight to the action question.
+
+Then get the action questions for the PRs the user chose, passing each chosen option label or `id`:
+
+```bash
+node scripts/render.ts "$DIR/prs.json" "$DIR/assessments.json" --actions '<label or id>' ...
+```
+
+Make those calls too. For `Approve with comment` or `Comment only`, the comment is the user's notes
+on that answer, or the text they typed under "Other". When neither has text, ask for the comment in
+chat. Drop PRs answered `Skip`.
+
+## 5. Post
+
+The user's answers are the confirmation. Write `$DIR/decisions.json`, with each comment word for
+word as the user wrote it:
+
+```json
+[
+  { "id": "owner/repo#123", "action": "approve" },
+  { "id": "owner/repo#124", "action": "approve-comment", "body": "Nice cleanup." },
+  { "id": "owner/repo#125", "action": "comment", "body": "Can we add a test for the empty case?" }
+]
+```
+
+```bash
+node scripts/review.ts "$DIR/prs.json" < "$DIR/decisions.json"
+```
+
+It checks every decision before posting any. When it refuses, fix the file and rerun.
 
 ## 6. Report
 
-List each PR acted on, the action taken, and whether `gh` succeeded. Done when every chosen PR has a
-result.
+Relay the line `review.ts` prints for each PR. Done when every chosen PR shows `ok` or `failed`, and
+each failure has its reason.
