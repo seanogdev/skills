@@ -57,7 +57,7 @@ GitHub mode. Push the fixes before you post.
 1. Write each reply to a file; never pass a body inline on the shell. Read shas, line numbers and issue numbers from their source right before use. Link shas as `[a1b2c3d](https://github.com/REPO/commit/FULL_SHA)` via `git log -1 --format='%h %H'`.
 2. Post:
    - Inline thread: `gh api repos/REPO/pulls/N/comments/<comments[0].databaseId>/replies -F body=@FILE`
-   - Review body or conversation comment: `gh pr comment N --body-file FILE`, opening with a link to what it answers: `Re [short label](url)`.
+   - Review bodies and conversation comments: answer them all in one `gh pr comment N --body-file FILE` per pass, never one comment each. Make it a list, one item per comment answered, each opening with a link to it: `- Re [short label](url): reply`.
 3. Vote on the feedback (`comments[0].id` of a thread, or the `id` of a review body or conversation comment) unless `userVotes` already holds one. `THUMBS_UP` when it should be addressed: fixed, or agreed but out of scope. `THUMBS_DOWN` when declined, but only on an automated comment (`isBot`); a human's decline is carried by the reply alone. No vote when asked or outdated.
    `gh api graphql -f query='mutation($id:ID!,$c:ReactionContent!){addReaction(input:{subjectId:$id,content:$c}){reaction{content}}}' -f id=ID -f c=THUMBS_UP`
 4. Resolve every thread you replied to, and hide every conversation comment you replied to with the minimize command from **Fetch**: fixed, declined, out of scope and outdated alike. Only an `Asked` one stays open, because the reviewer has not answered it yet.
