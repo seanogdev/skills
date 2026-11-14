@@ -1,6 +1,6 @@
 ---
 name: code-deep
-description: Hunt for performance wins in one area of a codebase, for lower latency, less memory, higher throughput, faster load or startup, or better perceived speed. Use when the user says "find optimizations in X", "why is this slow", "make this faster", "speed up load time", "cut memory use", "this doesn't scale", "do a perf pass", or points at a hot path, slow screen, slow endpoint, slow query, or slow job. Not for readability refactors, bug hunts, or general code review.
+description: Hunt for performance wins in one area of a codebase, for lower latency, less memory, higher throughput, faster load or startup, or better perceived speed. Use when the user wants to speed up, slim down, or scale some code, asks why it is slow, or points at a hot path, slow screen, slow endpoint, slow query, or slow job. Not for readability refactors, bug hunts, or general code review.
 license: MIT
 argument-hint: '[path, module or feature] [goal: latency | memory | throughput | load | perceived]'
 ---
