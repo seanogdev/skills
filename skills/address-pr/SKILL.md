@@ -22,7 +22,7 @@ Use GitHub mode whenever the findings are on a PR, even if this session also pro
 node scripts/fetch.ts [PR]   # defaults to the current branch's PR
 ```
 
-Returns unresolved inline threads, review bodies and conversation comments. Run it at the start of every pass; earlier reads are stale. Skip bot CI and coverage noise. Hide a bot comment that only tallies its inline findings ("🚨 1 blocking, 4 non-blocking") right away:
+Returns unresolved inline threads and unhidden review bodies and conversation comments. Run it at the start of every pass; earlier reads are stale. Skip bot CI and coverage noise. Hide a bot comment that only tallies its inline findings ("🚨 1 blocking, 4 non-blocking") right away:
 
 ```bash
 gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id=COMMENT_ID
@@ -30,7 +30,7 @@ gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,
 
 When `commentCount` is more than the comments you got, the middle of that thread is missing; read it on the PR before you reply.
 
-In a thread the first comment is the feedback and the rest is the discussion so far. A review body or conversation comment has no thread: a `me` comment that links to it is its discussion. A vote (`userVotes`) from `me`, or a non-`isBot` `me` comment, is the author's position; an `isBot` `me` comment is feedback to act on. Don't reply again to a thread whose last comment is a non-`isBot` `me` comment unless it asks something new; if that reply was not an `Asked`, the resolve did not land, so resolve it now.
+In a thread the first comment is the feedback and the rest is the discussion so far. A review body or conversation comment has no thread: a `me` comment that links to it is its discussion. A vote (`userVotes`) from `me`, or a non-`isBot` `me` comment, is the author's position; an `isBot` `me` comment is feedback to act on. Don't reply again to a thread whose last comment is a non-`isBot` `me` comment unless it asks something new; if that reply was not an `Asked`, the resolve did not land, so resolve it now. The same goes for a review body or conversation comment that a `me` comment already answers: if that answer was not an `Asked`, hide it now.
 
 ## Conflicts
 
@@ -60,7 +60,7 @@ GitHub mode. Push the fixes before you post.
    - Review bodies and conversation comments: answer them all in one `gh pr comment N --body-file FILE` per pass, never one comment each. Make it a list, one item per comment answered, each opening with a link to it: `- Re [short label](url): reply`.
 3. Vote on the feedback (`comments[0].id` of a thread, or the `id` of a review body or conversation comment) unless `userVotes` already holds one. `THUMBS_UP` when it should be addressed: fixed, or agreed but out of scope. `THUMBS_DOWN` when declined, but only on an automated comment (`isBot`); a human's decline is carried by the reply alone. No vote when asked or outdated.
    `gh api graphql -f query='mutation($id:ID!,$c:ReactionContent!){addReaction(input:{subjectId:$id,content:$c}){reaction{content}}}' -f id=ID -f c=THUMBS_UP`
-4. Resolve every thread you replied to, and hide every conversation comment you replied to with the minimize command from **Fetch**: fixed, declined, out of scope and outdated alike. Only an `Asked` one stays open, because the reviewer has not answered it yet.
+4. Resolve every thread you replied to, and hide every review body and conversation comment you replied to with the minimize command from **Fetch**, which marks it resolved: fixed, declined, out of scope and outdated alike. Only an `Asked` one stays open, because the reviewer has not answered it yet. Once nothing a `me` reply comment answers is still open, hide that reply comment too, along with any reviewer reply that settled an `Asked`.
    `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=THREAD_ID`
 
 Replies are one or two sentences, outcome first. Fixed: what changed plus the linked sha, and the reason when the fix is not the one suggested. Declined: the line or symbol that answers the comment. Out of scope: agree and say it goes to a follow-up. No openers like "Great point" or "You're right", and no recap of their comment.
