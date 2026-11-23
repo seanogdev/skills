@@ -65,7 +65,7 @@ GitHub mode. Push the fixes before you post.
 4. Resolve every thread you replied to, and hide every review body and conversation comment you replied to with the minimize command from **Fetch**, which marks it resolved: fixed, declined, out of scope and outdated alike. Only an `Asked` one stays open, because the reviewer has not answered it yet. Once nothing a `me` reply comment answers is still open, hide that reply comment too, along with any reviewer reply that settled an `Asked`.
    `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=THREAD_ID`
 
-Replies are one or two sentences, outcome first. Fixed: what changed plus the linked sha, and the reason when the fix is not the one suggested. Declined: the line or symbol that answers the comment. Out of scope: agree and say it goes to a follow-up. No openers like "Great point" or "You're right", and no recap of their comment.
+Replies are one or two sentences, outcome first. Fixed: what changed plus the linked sha, and the reason when the fix is not the one suggested. Declined: the line or symbol that answers the comment, or, when the code can't show the answer, the decision behind it, such as parity with existing behaviour, a spec or a product call. Out of scope: agree and say it goes to a follow-up. No openers like "Great point" or "You're right", and no recap of their comment.
 
 ## CI
 
@@ -75,7 +75,7 @@ GitHub mode, when `checks` is true — after any fixes are pushed, or right away
 
 In GitHub mode, run `fetch.ts` again and loop on anything new.
 
-If there is a PR, compare its description with `git diff <base>...HEAD` and update it where the branch no longer matches; no revision history, no "no longer applies" notes.
+If there is a PR, compare its description with `git diff <base>...HEAD` and update it where the branch no longer matches; no revision history, no "no longer applies" notes. Add each decision a decline rested on that the next review would raise again, since a reviewer that runs again reads the description, not the resolved threads.
 
 Then summarise to the user, one row per item, linked to its `url`:
 
