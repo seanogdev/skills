@@ -38,7 +38,9 @@ GitHub mode. If `mergeable` is `CONFLICTING`, merge the base (`base` from `fetch
 
 ## Decide
 
-Check each claim against the file as it stands now, not the diff hunk or the snippet quoted in the comment. Fix it when it holds up. When it names a real risk but its suggested fix is wrong, fix the risk the correct way and say how your fix differs. Decline when it misreads the code, is already handled, or would break something outside the diff. Ask when it's ambiguous. Out of scope when it's right but doesn't belong in this change; propose a follow-up task in the summary rather than creating one. For `isOutdated` threads, confirm the concern still applies.
+Check each claim against the file as it stands now, not the diff hunk or the snippet quoted in the comment. Fix it when it holds up. Before you apply a suggested fix as written, check it against the real signature of what it calls and at each call site of what it changes. When it names a real risk but its suggested fix is wrong, fix the risk the correct way and say how your fix differs. Decline when it misreads the code, is already handled, or would break something outside the diff. Ask when it's ambiguous. Out of scope when it's right but doesn't belong in this change; propose a follow-up task in the summary rather than creating one. A defect in lines this PR doesn't change is on the base too: out of scope, unless this change makes it worse or newly reachable. For `isOutdated` threads, confirm the concern still applies.
+
+When several comments raise one issue, in any words or on any line, fix it once and give each the same outcome.
 
 Every finding gets an outcome. A 👍, 👎 or reply from `me` in the thread settles the close calls; when it disagrees with what the code shows, follow the code and say so in the summary.
 
