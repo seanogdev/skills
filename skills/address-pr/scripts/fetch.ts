@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Read the unresolved inline threads, review bodies and unhidden conversation comments on a PR,
+// Read the unresolved inline threads and unhidden review bodies and conversation comments on a PR,
 // and whether it conflicts with its base (mergeable: MERGEABLE, CONFLICTING or UNKNOWN).
 // base: the branch the PR merges into. checks: whether CI has reported on the PR yet.
 // userVotes: 👍/👎 already on the feedback from this account. isBot: a GitHub App author.
@@ -62,7 +62,7 @@ interface Response {
             tail: { nodes: ThreadComment[] };
           } | null)[];
         };
-        reviews: { pageInfo: Page; nodes: Voteable[] };
+        reviews: { pageInfo: Page; nodes: (Voteable & { isMinimized: boolean })[] };
         comments: { pageInfo: Page; nodes: (Voteable & { isMinimized: boolean })[] };
       };
     };
@@ -90,7 +90,7 @@ query($owner:String!, $repo:String!, $number:Int!) {
                 tail: comments(last:5) { nodes { ...C } } }
       }
       reviews(last:100) { pageInfo { hasPreviousPage }
-                          nodes { id url body author { login __typename }
+                          nodes { id url body isMinimized author { login __typename }
                                   up: reactions(content:THUMBS_UP) { viewerHasReacted }
                                   down: reactions(content:THUMBS_DOWN) { viewerHasReacted } } }
       comments(last:100) { pageInfo { hasPreviousPage }
@@ -199,7 +199,7 @@ try {
     number: pr.number,
     pr: pr.url,
     repo: repository.nameWithOwner,
-    reviews: pr.reviews.nodes.filter((r) => r.body !== '').map((r) => feedback(r)),
+    reviews: pr.reviews.nodes.filter((r) => r.body !== '' && !r.isMinimized).map((r) => feedback(r)),
     threads,
   };
 
