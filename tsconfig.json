@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["skills/**/*.ts", "tests/**/*.ts"]
+  "include": ["skills/**/*.ts", ".claude/skills/**/*.ts", "tests/**/*.ts"]
 }

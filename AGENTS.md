@@ -13,6 +13,8 @@ skill so it works on any machine:
 - Never run `scripts/optimize-skill-descriptions.sh` yourself, even after adding a skill or changing
   a `description` field. It makes billed calls and rewrites descriptions, so only the user runs it. Tell them when a
   description has changed and leave the run to them.
+- `.claude/skills/` holds skills for maintaining this repo, not for publishing. They may name a skill
+  under `skills/`, since they exist to change it.
 - The repo root is also a Claude Code plugin root (`.claude-plugin/`). Adding a skill under
   `skills/` is enough; there is no separate list to update.
 - The `Skill` tool never reads this repo directly. It reads the installed copy under
