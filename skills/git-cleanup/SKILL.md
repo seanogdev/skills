@@ -1,10 +1,10 @@
 ---
-name: prune-merged-branches
+name: git-cleanup
 description: Delete the local git branches that are merged, and remove their worktrees. A branch counts as merged into its own PR base, or into the fallback base. Local only. It never changes the remote.
 license: MIT
 argument-hint: '[--apply] [--base <ref>] [--force-dirty] [--no-gh]'
 disable-model-invocation: true
-allowed-tools: Bash(node *prune-merged-branches/scripts/prune.ts*), Bash(git worktree list*), Bash(git branch*), Bash(git log*), Bash(gh pr view*)
+allowed-tools: Bash(node *git-cleanup/scripts/prune.ts*), Bash(git worktree list*), Bash(git branch*), Bash(git log*), Bash(gh pr view*)
 ---
 
 # Prune merged branches
