@@ -40,6 +40,12 @@ node scripts/tally.ts <dir>
 
 Fix each problem it prints before you read a count.
 
+A fix that should have been a decline draws no pushback, so the judges never see it. Send `<dir>/audit.md` to one subagent on a mid-tier model:
+
+> Each item in `<dir>/audit.md` is review feedback that the PR author fixed, with no later response. For each, read the linked commit (`gh api repos/OWNER/NAME/commits/SHA`) and the code it changed, and decide if the feedback named a real defect, or a suggestion worth what it added. Write `<dir>/audit.jsonl`, one line per item: `{"url","needed","reason"}`. `needed`: yes | no | unclear. `no` is a fix for a claim the code disproves, or one that adds a guard, option or abstraction that the code did not need. Return only the count per value.
+
+Count each `no` as a `decide` cause, with the same evidence bar.
+
 ## 3. Read the signal
 
 - Open each thread behind a count before you trust it. A bot re-run posts new findings on the same file, and only the same defect is a re-raise.

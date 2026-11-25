@@ -8,6 +8,7 @@ import {
   hasSignal,
   linkedShas,
   parseJudgment,
+  silentFixes,
   tally,
 } from '../.claude/skills/update-address-pr/scripts/lib.ts';
 import type { GqlComment, GqlPr } from '../.claude/skills/update-address-pr/scripts/lib.ts';
@@ -129,4 +130,39 @@ test('tally groups causes by PR and reviewer and reports unjudged items', () => 
   assert.equal(result.causes[0].cause, 'reply');
   assert.equal(result.causes[0].prs, 1);
   assert.equal(result.byOutcome.declined.pushback, 1);
+});
+
+test('silentFixes keeps silent answers that link a fix, spread across the list', () => {
+  const fix = (path: string) =>
+    thread(
+      [
+        c({ at: '2026-01-01', login: 'r1' }),
+        c({ at: '2026-01-02', body: 'Fixed in https://github.com/o/r/commit/1234567aa', login: ME }),
+      ],
+      path,
+    );
+  const decline = thread(
+    [c({ at: '2026-01-01', login: 'r1' }), c({ at: '2026-01-02', body: 'No change', login: ME })],
+    'd.ts',
+  );
+  const disputed = thread(
+    [
+      c({ at: '2026-01-01', login: 'r1' }),
+      c({ at: '2026-01-02', body: 'Fixed in https://github.com/o/r/commit/1234567aa', login: ME }),
+      c({ at: '2026-01-03', login: 'r1' }),
+    ],
+    'e.ts',
+  );
+  const items = buildItems(
+    pr({ reviewThreads: { nodes: [fix('a.ts'), decline, fix('b.ts'), disputed, fix('c.ts'), fix('f.ts')] } }),
+    ME,
+  );
+  assert.deepEqual(
+    silentFixes(items, 10).map((i) => i.path),
+    ['a.ts', 'b.ts', 'c.ts', 'f.ts'],
+  );
+  assert.deepEqual(
+    silentFixes(items, 2).map((i) => i.path),
+    ['a.ts', 'c.ts'],
+  );
 });

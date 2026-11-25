@@ -240,6 +240,12 @@ export function hasSignal(item: Item): boolean {
   return item.after.length > 0 || item.laterFeedback.length > 0 || item.laterCommits.some((c) => /\brevert/iu.test(c));
 }
 
+export function silentFixes(items: Item[], limit: number): Item[] {
+  const fixes = items.filter((i) => !hasSignal(i) && i.shas.length > 0);
+  if (fixes.length <= limit) return fixes;
+  return Array.from({ length: limit }, (_, k) => fixes[Math.floor((k * fixes.length) / limit)]);
+}
+
 export function chunk<T>(list: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));

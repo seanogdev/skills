@@ -4,16 +4,17 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildItems, chunk, hasSignal, renderItem } from './lib.ts';
+import { buildItems, chunk, hasSignal, renderItem, silentFixes } from './lib.ts';
 import type { GqlPr, Item } from './lib.ts';
 
 const HELP = `Collect the review feedback a PR author answered, and what happened after each answer.
-Usage: collect.ts [--repo OWNER/NAME] [--days N] [--author LOGIN] [--batch N]
+Usage: collect.ts [--repo OWNER/NAME] [--days N] [--author LOGIN] [--batch N] [--audit N]
   --repo    default: the repository of the current checkout
   --days    PRs updated in the last N days. Default: 30
   --author  whose PRs and answers. Default: the gh user
   --batch   items per judge-N.md. Default: 40
-Writes items.json, and judge-N.md with the items that drew a later response, to a new temp directory and prints its path and counts.`;
+  --audit   silent fixes in audit.md. Default: 20
+Writes items.json, judge-N.md with the items that drew a later response, and audit.md with a spread of silent fixes, to a new temp directory and prints its path and counts.`;
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -75,6 +76,8 @@ const batches = chunk(items.filter((i) => hasSignal(i)), batch);
 for (const [i, group] of batches.entries()) {
   writeFileSync(join(dir, `judge-${i + 1}.md`), group.map((item) => renderItem(item)).join('\n\n---\n\n'));
 }
+const audit = silentFixes(items, Number(arg('audit', '20')));
+writeFileSync(join(dir, 'audit.md'), audit.map((item) => renderItem(item)).join('\n\n---\n\n'));
 
 const count = (pred: (i: Item) => boolean) => items.filter(pred).length;
 console.log(
@@ -86,5 +89,6 @@ console.log(
     `reviewer spoke after the answer: ${count((i) => i.after.length > 0)}, later feedback on the same spot: ${count((i) => i.laterFeedback.length > 0)}`,
     `to judge: ${count((i) => hasSignal(i))}, silent: ${count((i) => !hasSignal(i))}`,
     `judge files: ${batches.map((_, i) => `judge-${i + 1}.md`).join(', ')}`,
+    `audit.md: ${audit.length} silent fixes`,
   ].join('\n'),
 );
