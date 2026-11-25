@@ -604,18 +604,15 @@ Compare each screen that the run touched with origin/${plan.defaultBranch} in a 
 }
 
 async function checkCompleteness() {
-  const prs = shared
-    ? pr && pr.prUrl
-      ? [
-          `${shared} into ${plan.defaultBranch} (${pr.prUrl}): ${results
-            .filter((r) => r.status === 'landed')
-            .map((r) => r.id)
-            .join(', ')}`,
-        ]
-      : []
-    : results
-        .filter((r) => r.prUrl && targets.has(r.id))
-        .map((r) => `${r.branch} into ${targets.get(r.id).base} (${r.prUrl}): ${r.id}`);
+  let prs = [];
+  if (!shared) {
+    prs = results
+      .filter((r) => r.prUrl && targets.has(r.id))
+      .map((r) => `${r.branch} into ${targets.get(r.id).base} (${r.prUrl}): ${r.id}`);
+  } else if (pr && pr.prUrl) {
+    const landed = results.filter((r) => r.status === 'landed').map((r) => r.id);
+    prs = [`${shared} into ${plan.defaultBranch} (${pr.prUrl}): ${landed.join(', ')}`];
+  }
   if (prs.length === 0) return;
   const missing = results.filter((r) => !OK.has(r.status)).map((r) => `- ${r.id} ${r.title}: ${r.status}`);
   return agent(
