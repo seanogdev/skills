@@ -52,7 +52,7 @@ In session, act and report the outcome instead of asking. Findings this session 
 
 ## Apply
 
-Fix the cause, not the symptom: suppressing a warning, skipping a test, loosening an assertion, editing a workflow or special-casing the reviewer's input is not a fix. A comment names one path to a defect: before you commit, find the others that reach it, such as other events and branches, the error, empty and loading states, and every reader of what you changed, and fix them too. Then check the fix keeps what the old code did; one that drops a shortcut, an accessible name or a style keyed on what you changed swaps one defect for another. Fix in small commits.
+Fix the cause, not the symptom: suppressing a warning, skipping a test, loosening an assertion, editing a workflow or special-casing the reviewer's input is not a fix. A comment names one path to a defect: before you commit, find the others that reach it, such as other events and branches, the error, empty and loading states, and every reader of what you changed, and fix them too. Then check the fix keeps what the old code did; one that drops a shortcut, an accessible name or a style keyed on what you changed swaps one defect for another. Also check it adds no second copy of what the repo already has, such as a token set, a rule or a helper; use the one that exists. Fix in small commits.
 
 ## Reply
 
